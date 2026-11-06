@@ -21,6 +21,7 @@
     "apps/web/tests/fold-blank-matrix.e2e.ts",
     "apps/web/tests/chat-fold-opened-group.e2e.ts",
     "apps/web/tests/chat-flow-layout.e2e.ts",
+    "apps/web/tests/conversation-scroll.e2e.ts",
     "apps/web/product-isolation.ts",
     "apps/web/katex-fonts.ts",
     "apps/web/tests/connection-recovery.e2e.ts",

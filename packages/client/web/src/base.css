@@ -8,6 +8,13 @@ body,
   margin: 0;
 }
 
+/* The shell owns the viewport; panels own scrolling. Plugin nodes beside
+   #root (including zero-size inline SVG filters) must not scroll the page. */
+html,
+body {
+  overflow: clip;
+}
+
 body {
   font-family: var(
     --dsw-font-family,

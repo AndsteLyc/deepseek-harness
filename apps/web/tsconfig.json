@@ -37,6 +37,7 @@
     "tests/fold-blank-matrix.e2e.ts",
     "tests/chat-fold-opened-group.e2e.ts",
     "tests/chat-flow-layout.e2e.ts",
+    "tests/conversation-scroll.e2e.ts",
     "tests/layout-bottom.e2e.ts",
     "tests/shortcuts-desktop.e2e.ts",
     "tests/shortcuts-workspace.e2e.ts",
