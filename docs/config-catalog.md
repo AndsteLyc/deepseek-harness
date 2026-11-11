@@ -4089,13 +4089,20 @@ export interface Config {
 ## `@deepseek-ai/dsh-time-context`
 
 - `inject`: `agents` · `sessionProjections`
-- `source`: [`packages/context/time-context/src/index.ts:52`](../packages/context/time-context/src/index.ts)
+- `source`: [`packages/context/time-context/src/index.ts:51`](../packages/context/time-context/src/index.ts)
 
 ```ts config-catalog
 /** Request-preparation clock formatting and append scheduling. Invalid values fail plugin load. */
 export interface Config {
   /** Fallback display zone when the open turn has no unique browser zone. Omit to use the process zone. */
   timeZone?: string
+  /**
+   * Append the browser time-zone policy line that tells the model which zone owns unqualified times.
+   * Defaults to true; false keeps only the timestamp and elapsed lines, while the timestamp still names
+   * the zone it was formatted in. A mixed or missing browser zone then reaches the model as no policy at
+   * all, so the model is not asked to clarify.
+   */
+  includeTimeZone?: boolean
   /** Minimum milliseconds between durable injections in one session. Defaults to 600000 (10 minutes); 0 injects at every eligible step. */
   refreshIntervalMs?: number
 }

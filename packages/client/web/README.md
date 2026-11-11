@@ -31,6 +31,8 @@ Static application pages install `__DSH_BOOT_READY__` before the entry runs. The
 
 The shell base styles preserve authored text sizes when mobile browsers rotate or unfold. Browser zoom and the appearance font-size setting remain available. They also apply automatic CJK/Latin spacing to ordinary content in supporting browsers. Semantic code and terminal, diff, read, and search output containers retain literal source spacing and column alignment; browsers without `text-autospace` support ignore both declarations.
 
+On macOS Desktop, the shell excludes dsh-pet's full-window baifan and score-particle decoration roots from native drag-region collection. Their interactive descendants, score popup, and menus keep the normal control exclusions; other overlays and platforms are unchanged.
+
 Web and Desktop mathematical rendering requires WOFF2 support. The [Web build](../../../apps/web/katex-fonts.ts) retains every KaTeX font face in WOFF2 and omits WOFF/TTF fallbacks; a face without WOFF2 rejects the build. Font glyphs, weights, styles, and layout rules are preserved.
 
 ### What boot looks like

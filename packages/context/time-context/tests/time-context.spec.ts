@@ -195,6 +195,34 @@ describe('durable step context', () => {
     expect(event.surfaceOp).toBe('append')
   })
 
+  it.each([
+    { zones: ['America/New_York'], timestamp: '2026-07-14T21:01:01-04:00[America/New_York]' },
+    { zones: [], timestamp: '2026-07-15T09:01:01+08:00[Asia/Shanghai]' },
+    { zones: ['America/New_York', 'Asia/Shanghai'], timestamp: '2026-07-15T09:01:01+08:00[Asia/Shanghai]' },
+  ])('omits the browser policy but keeps clock formatting for $zones', async ({ zones, timestamp }) => {
+    const { ctx } = await mount({ timeZone: 'Asia/Shanghai', includeTimeZone: false, refreshIntervalMs: 0 })
+    const session = Session.create(SessionId('without-zone-line'))
+    const agent = sessionAgent(session)
+    openMessageTurn(session, 1, zones[0])
+    if (zones[1] !== undefined) {
+      session.append('user/message', createUserMessage({
+        content: [{ type: 'text', text: 'steering from another browser' }],
+        source: { kind: 'user', rpcId: 'mixed-steer', clientTimeZone: zones[1] } as never,
+      }), { surfaceOp: 'append' })
+    }
+    vi.setSystemTime(BASE + 90_061_000)
+
+    await fire(ctx, agent, 1, 1)
+    await fire(ctx, agent, 1, 2)
+
+    expect(contextTexts(session)).toEqual([
+      `Time sampled while preparing turn 1, step 1: ${timestamp}\n`
+      + 'Elapsed since the preceding model-visible message: 1d 1h 1m 1s.',
+      `Time sampled while preparing turn 1, step 2: ${timestamp}\n`
+      + 'Elapsed since the preceding step context: 0s.',
+    ])
+  })
+
   it('reports an unavailable first-step baseline when no model-visible message precedes it', async () => {
     const { ctx } = await mount()
     const session = Session.create(SessionId('unavailable'))

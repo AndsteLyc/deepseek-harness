@@ -1,0 +1,22 @@
+# Keep the shipped standard preset unchanged; disable only interactive carriers.
+- id: web-startup
+  disabled: true
+- id: webserver
+  disabled: true
+- id: web-runtime
+  disabled: true
+- id: connection
+  disabled: true
+- id: modules
+  disabled: true
+- id: hmr
+  disabled: true
+
+- id: session-persistence-jsonl
+  config:
+    root: './.sessions'
+    compression: none
+
+- insert:
+    - id: standard-preset-clock-mock
+      name: './standard-preset-mock.ts'

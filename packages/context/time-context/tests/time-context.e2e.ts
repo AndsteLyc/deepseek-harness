@@ -28,7 +28,7 @@ async function jsonlFiles(dir: string): Promise<string[]> {
 }
 
 describe('time-context through the production headless profile', () => {
-  it('uses the process zone and throttles context across turns by default', async () => {
+  it.each([true, false])('preserves the clock and throttle with includeTimeZone=%s', async (includeTimeZone) => {
     let events: SessionEvent[] = []
     const { stderr } = await runLoaderSmoke({
       label: 'time-context headless smoke',
@@ -37,7 +37,7 @@ describe('time-context through the production headless profile', () => {
       libBinScript: driver,
       configPath,
       tsconfigPath: repoTsconfig,
-      env: { TZ: 'Asia/Shanghai' },
+      env: { TZ: 'Asia/Shanghai', TIME_CONTEXT_TEST_INCLUDE_ZONE: String(includeTimeZone) },
       inspect: async (cwd) => {
         const logs = await jsonlFiles(join(cwd, '.sessions'))
         expect(logs).toHaveLength(1)
@@ -73,6 +73,8 @@ describe('time-context through the production headless profile', () => {
       /Time sampled while preparing turn 1, step 1: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00\[Asia\/Shanghai\]/,
     )
     expect(contextText[0]).toContain('Elapsed since the preceding model-visible message: unavailable.')
+    expect(contextText[0]?.includes('Browser time zone for this request:')).toBe(includeTimeZone)
+    expect(contextText[0]?.split('\n')).toHaveLength(includeTimeZone ? 3 : 2)
 
     const headers = events.filter(event => event.type === 'request/header')
     expect(JSON.stringify(headers)).not.toContain('Time sampled while preparing')

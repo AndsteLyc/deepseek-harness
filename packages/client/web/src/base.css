@@ -91,6 +91,15 @@ html[data-platform='darwin'] body > :not(#root) {
   -webkit-app-region: no-drag;
 }
 
+/* dsh-pet's full-window decorations must not subtract the window drag surface.
+   Its baifan layer declares `none !important`, which Chromium interprets as
+   `no-drag`; `initial` actually opts out. Outrank that ID rule without resetting
+   interactive descendants or the plugin's score popup and menus. */
+html[data-platform='darwin'] body > #dsh-pet-baifan-root,
+html[data-platform='darwin'] body > .dsh-pet-score-burst {
+  -webkit-app-region: initial !important;
+}
+
 /* An interactive viewport without nested drag rows owns one box; its clipped
    descendants do not.
    Containers with nested drag rows must instead declare their own region. */
