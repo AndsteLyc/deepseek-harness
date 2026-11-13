@@ -139,7 +139,7 @@ jobs:
     needs: sync-custom
     if: needs.sync-custom.outputs.updated == 'true' || (github.event_name == 'workflow_dispatch' && inputs.build)
     permissions:
-      contents: read
+      contents: write
     uses: ./.github/workflows/fork-package-macos.yml
     with:
       ref: custom
