@@ -977,6 +977,74 @@ describe('web e2e: macOS window drag coverage', () => {
     }
   }, 120_000)
 
+  it.each(['darwin', 'win32'] as const)('%s keeps dsh-pet transparent layers from changing native chrome behavior', async (platform) => {
+    const { page, tripwire } = await desktopPage(platform)
+    try {
+      const workspaceName = `pet-drag-${platform}`
+      const workspace = join(scaffold.workspaceCwd, workspaceName)
+      await connectFreshWorkspace(page, scaffold.workspaceCwd, workspaceName)
+      const currentAgent = async () => {
+        const id = await page.locator('[data-conversation-content]').first().getAttribute('data-conversation-session')
+        return scaffold.ctx.agents.list().find(candidate => candidate.id === id)
+      }
+      await expect.poll(async () => (await currentAgent())?.session.header.cwd).toBe(workspace)
+      const agent = await currentAgent()
+      if (agent === undefined) throw new Error('connected workspace did not create an Agent')
+      agent.session.append('turn/start', { turn: 1 })
+      const more = page.getByRole('button', { name: 'More actions', exact: true })
+      await more.waitFor()
+      await settled(page)
+      const header = await rectOf(page, '[data-slot="conversation.header"] > header')
+      const titlePoint = [header.x + header.width / 2, header.y + 4] as const
+      expect(isDraggableAt(await collectedRegions(page, INTERACTIVE_SELECTOR), ...titlePoint))
+        .toBe(platform === 'darwin')
+
+      // dsh-pet 0.4.6 injects these sheets after the shell; explicit `none` computes to `no-drag`.
+      await page.addStyleTag({ content: `
+        #dsh-pet-baifan-root {
+          position: fixed; inset: 0; pointer-events: none;
+          -webkit-app-region: none !important;
+        }
+        .dsh-pet-score-burst { position: fixed; inset: 0; pointer-events: none; }
+      ` })
+      await page.evaluate(() => {
+        const baifan = document.createElement('div')
+        baifan.id = 'dsh-pet-baifan-root'
+        const burst = document.createElement('div')
+        burst.className = 'dsh-pet-score-burst'
+        document.body.append(baifan, burst)
+      })
+      const layers = page.locator('body > #dsh-pet-baifan-root, body > .dsh-pet-score-burst')
+      expect(await layers.evaluateAll(elements => elements.map(element => ({
+        region: getComputedStyle(element).getPropertyValue('-webkit-app-region'),
+        pointerEvents: getComputedStyle(element).pointerEvents,
+        coversViewport: element.getBoundingClientRect().width === innerWidth
+          && element.getBoundingClientRect().height === innerHeight,
+      })))).toEqual([
+        { region: platform === 'darwin' ? 'none' : 'no-drag', pointerEvents: 'none', coversViewport: true },
+        { region: 'none', pointerEvents: 'none', coversViewport: true },
+      ])
+      const regions = await collectedRegions(page, INTERACTIVE_SELECTOR)
+      expect(isDraggableAt(regions, ...titlePoint), 'transparent plugin layers preserve the title drag point')
+        .toBe(platform === 'darwin')
+      if (platform === 'darwin') {
+        expect(await more.evaluate(element => getComputedStyle(element).getPropertyValue('-webkit-app-region')))
+          .toBe('no-drag')
+        const button = (await more.boundingBox())!
+        expect(isDraggableAt(regions, button.x + button.width / 2, button.y + button.height / 2)).toBe(false)
+        await more.click()
+        const menu = page.getByRole('menu')
+        await menu.waitFor()
+        expect(await menu.evaluate(element => getComputedStyle(element).getPropertyValue('-webkit-app-region')))
+          .toBe('no-drag')
+        const box = (await menu.boundingBox())!
+        expect(isDraggableAt(await collectedRegions(page, INTERACTIVE_SELECTOR), box.x + box.width / 2, box.y + box.height / 2))
+          .toBe(false)
+      }
+      expect(tripwire.pageErrors).toEqual([])
+    } finally { await page.close() }
+  })
+
   it('keeps a covering overlay out of the drag surface', async () => {
     const { page, tripwire } = await desktopPage()
     try {

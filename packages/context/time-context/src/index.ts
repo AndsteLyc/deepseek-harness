@@ -26,7 +26,6 @@ import {
   reportedBrowserTimeZone,
   renderBrowserTimeZoneContext,
 } from './request-zone.ts'
-import type { BrowserTimeZoneContext } from './request-zone.ts'
 import { createTimestampFormatter, formatTimestamp } from './timestamp.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
@@ -52,6 +51,13 @@ export const inject = ['agents', 'sessionProjections']
 export interface Config {
   /** Fallback display zone when the open turn has no unique browser zone. Omit to use the process zone. */
   timeZone?: string
+  /**
+   * Append the browser time-zone policy line that tells the model which zone owns unqualified times.
+   * Defaults to true; false keeps only the timestamp and elapsed lines, while the timestamp still names
+   * the zone it was formatted in. A mixed or missing browser zone then reaches the model as no policy at
+   * all, so the model is not asked to clarify.
+   */
+  includeTimeZone?: boolean
   /** Minimum milliseconds between durable injections in one session. Defaults to 600000 (10 minutes); 0 injects at every eligible step. */
   refreshIntervalMs?: number
 }
@@ -59,6 +65,7 @@ export interface Config {
 /** Schemastery validation for {@link Config}. */
 export const Config: z<Config> = z.object({
   timeZone: z.string(),
+  includeTimeZone: z.boolean(),
   refreshIntervalMs: z.number(),
 })
 
@@ -102,14 +109,16 @@ function renderText(
   previous: number | undefined,
   formatter: Intl.DateTimeFormat,
   timeZone: string,
-  browserContext: BrowserTimeZoneContext,
+  browserText: string | undefined,
 ): string {
   const elapsed = previous === undefined ? 'unavailable' : formatDuration(now - previous)
   const baseline = step === 1 ? 'model-visible message' : 'step context'
-  const browserText = renderBrowserTimeZoneContext(browserContext)
-  return `Time sampled while preparing turn ${turn}, step ${step}: ${formatTimestamp(now, formatter, timeZone)}\n`
-    + `${browserText}\n`
-    + `Elapsed since the preceding ${baseline}: ${elapsed}.`
+  const lines = [
+    `Time sampled while preparing turn ${turn}, step ${step}: ${formatTimestamp(now, formatter, timeZone)}`,
+    ...(browserText === undefined ? [] : [browserText]),
+    `Elapsed since the preceding ${baseline}: ${elapsed}.`,
+  ]
+  return lines.join('\n')
 }
 
 /** Reject refresh intervals that cannot represent an exact elapsed-millisecond threshold. */
@@ -132,6 +141,7 @@ function validateRefreshInterval(refreshIntervalMs: number): void {
  */
 export async function apply(ctx: Context, config: Config): Promise<void> {
   const timeZone = config.timeZone
+  const includeTimeZone = config.includeTimeZone ?? true
   const refreshIntervalMs = config.refreshIntervalMs ?? 600_000
   validateRefreshInterval(refreshIntervalMs)
   let fallbackFormatter: Intl.DateTimeFormat
@@ -227,7 +237,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       previous,
       formatterFor(selectedTimeZone),
       selectedTimeZone,
-      browser,
+      includeTimeZone ? renderBrowserTimeZoneContext(browser) : undefined,
     )
     return {
       ...decision,

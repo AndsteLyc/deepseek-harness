@@ -18,14 +18,14 @@
   en: 0289a0503ae95934
   zh: 8aa8e24f9fcba4f4
 /deepseek-ai-dsh-time-context/use-this-package/what-the-model-gets:
-  en: 104b5d5609b00f33
-  zh: f6115b4eaa24bda7
+  en: c791f9d1db8b6282
+  zh: 984c1f58ea7005b5
 /deepseek-ai-dsh-time-context/use-this-package/configuration:
-  en: e6ac1f330c18c69c
-  zh: 9e969a5b377ba62a
+  en: 6b4b5fc593c4fd20
+  zh: 959f3f3675ce3c3f
 /deepseek-ai-dsh-time-context/use-this-package/choosing-the-zone:
-  en: 7eed0d784ad7381b
-  zh: 47a849df0ce80105
+  en: 756e757af4dc2d93
+  zh: b33768861f83c0e1
 /deepseek-ai-dsh-time-context/understand-the-implementation:
   en: 2d21fa2aad5a729d
   zh: cfbfada0eb647435
@@ -57,14 +57,14 @@
   en: d583e2c01b797bef
   zh: 74b908a4fd7972e7
 /deepseek-ai-dsh-time-context/model-experience/preparation-time-temporal-context/token-effect:
-  en: fc72bbd239df14db
-  zh: 750a04f8d4f1b6db
+  en: 57ef9915f2d3510d
+  zh: 0fbb3c7da050b256
 /deepseek-ai-dsh-time-context/model-experience/preparation-time-temporal-context/kv-cache-effect:
   en: 2fbf2175168e8244
   zh: f681f89596f500f5
 /deepseek-ai-dsh-time-context/known-limitations-and-deferred-work:
-  en: 825ebd4015f57a5c
-  zh: 08defcdd0fa17b81
+  en: bf0d8ed4b65a012b
+  zh: 07e7d1fc6d65fc02
 /deepseek-ai-dsh-time-context/known-limitations-and-deferred-work/dev-note:
   en: e67f633dc6fe7773
   zh: 3bb0c20c93f16f98

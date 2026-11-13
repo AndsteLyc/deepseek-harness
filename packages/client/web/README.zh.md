@@ -33,6 +33,8 @@ kind: "package-library"
 
 静态 Client 库保留第三方 ESM import 和动态 import，交给最终 Web 构建。其样式元信息通过普通 URL import 引用第三方字体资源；包级构建不复制这些字体，也不生成语言库 chunk。
 
+在 macOS Desktop 中，外壳会将 dsh-pet 全窗口的吃白饭及积分粒子装饰层根节点排除在原生拖拽区域计算之外。其交互子元素、积分弹窗和菜单仍保留正常的控件排除规则；其他覆盖层及平台不受影响。
+
 ### 启动过程是怎样的
 
 启动分两个阶段：模块阶段接纳 parser 已加载的 bootstrap 批次，从 Host 提供的启动图构建模块系统，并通过只执行一次的共享 application 批次 URL 预取 `immediately` 层级。插件阶段随后激活每个图 entry 并等待全部就绪，之后才把带标记的启动 DOM 交给 UI 渲染器，由它 hydrate 并切换到完整 UI。

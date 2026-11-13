@@ -29,7 +29,7 @@ Mount this plugin when the model should interpret unqualified dates and times in
 
 ### What the model gets
 
-Each injected reading has three lines: an ISO-shaped timestamp with numeric offset and IANA zone, the browser-zone policy for the request, and the elapsed duration in compact whole-second units. Step 1 measures from the latest preceding model-visible message; later steps measure from the preceding time-context event in the same turn. A missing baseline reports `unavailable`, and backward wall-clock movement clamps elapsed time to zero.
+Each injected reading has three lines: an ISO-shaped timestamp with numeric offset and IANA zone, the browser-zone policy for the request, and the elapsed duration in compact whole-second units. Step 1 measures from the latest preceding model-visible message; later steps measure from the preceding time-context event in the same turn. A missing baseline reports `unavailable`, and backward wall-clock movement clamps elapsed time to zero. The policy line is optional: `includeTimeZone: false` keeps the timestamp and the elapsed duration only. The `standard` preset sets this to `false`; the plugin itself defaults to `true`.
 
 ### Configuration
 
@@ -44,13 +44,14 @@ The minimal mount needs no configuration. A positive `refreshIntervalMs` suppres
 | Field | Default | Meaning |
 |---|---|---|
 | `timeZone` | process zone | Fallback display zone when the open turn has no unique browser zone |
+| `includeTimeZone` | `true` | Append the browser-zone policy line; `false` keeps the timestamp and elapsed duration only |
 | `refreshIntervalMs` | `600000` (10 minutes) | Minimum milliseconds between durable injections in one session |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-time-context) is the exhaustive source for every accepted field and its JSDoc.
 
 ### Choosing the zone
 
-When the open turn contains exactly one Host-validated browser zone, the timestamp is formatted in that request-local zone. With missing or mixed browser-zone records, the configured `timeZone` formats the display; omitting it resolves the Node process zone once at plugin load, and every explicit fallback is validated through `Intl.DateTimeFormat`. The resolved instruction tells the model to interpret unqualified dates and times in the chosen zone, and to ask the user to clarify when those records are mixed or unavailable.
+When the open turn contains exactly one Host-validated browser zone, the timestamp is formatted in that request-local zone. With missing or mixed browser-zone records, the configured `timeZone` formats the display; omitting it resolves the Node process zone once at plugin load, and every explicit fallback is validated through `Intl.DateTimeFormat`. The resolved instruction tells the model to interpret unqualified dates and times in the chosen zone, and to ask the user to clarify when those records are mixed or unavailable. With `includeTimeZone: false`, the model receives neither the unqualified-time instruction nor the clarification instruction; the timestamp still includes its numeric offset and IANA zone.
 
 -----
 
@@ -122,7 +123,7 @@ Elapsed since the preceding step context: <duration-or-unavailable>.
 
 #### Token effect
 
-Each reading accumulates until compaction shadows it. A positive interval reduces additions; `0` adds one at every eligible preparation attempt.
+Each reading accumulates until compaction shadows it. A positive interval reduces additions; `0` adds one at every eligible preparation attempt. `includeTimeZone: false` omits the middle line from both shapes, leaving the timestamp line and the elapsed line.
 
 #### KV Cache effect
 
@@ -137,8 +138,8 @@ These limits define when clock context is a poor fit. They are current package c
 
 - **State and replay cost** — timestamps and the current turn number have fixed size. Zone state grows with distinct reported strings in the latest entered turn, not all messages; each new distinct zone copies that list. Formatters remain discardable process caches. The standard AgentLoop requests its latest entered turn. If a typed pre-step caller requests another turn, the original full-prefix synchronous scan includes later entered messages. Retiring this fallback requires limiting pre-step requests to the latest entered turn and updating callers together.
 - **Prompt guidance only** — browser-zone context guides natural-language interpretation but does not silently supply another tool's required zone field.
-- **Mixed turns ask** — if one open turn contains prompts from different browser zones, the model is told to clarify rather than guess which one owns an unqualified time.
-- **Fallback is not user authority** — the configured or process zone formats the clock when current-turn browser zones are missing or mixed, but the model-facing policy still says to clarify.
+- **Mixed turns ask** — with `includeTimeZone: true`, if one open turn contains prompts from different browser zones, the model is told to clarify rather than guess which one owns an unqualified time.
+- **Fallback is not user authority** — the configured or process zone formats the clock when current-turn browser zones are missing or mixed; the clarification policy is included only with `includeTimeZone: true`.
 - **Whole-second display** — timestamps and durations omit sub-second precision even though durable event times retain milliseconds.
 - **History cost between compactions** — `0` retains one reading for every eligible attempt; a positive interval reduces but does not eliminate this cost and may leave a later request without fresh browser-zone guidance.
 

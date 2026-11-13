@@ -33,6 +33,8 @@ The shell base styles preserve authored text sizes when mobile browsers rotate o
 
 Static Client libraries preserve third-party ESM imports and dynamic imports for the final Web build. Their stylesheet metadata refers to third-party font assets through normal URL imports; the package build does not copy those fonts or emit language-library chunks.
 
+On macOS Desktop, the shell excludes dsh-pet's full-window baifan and score-particle decoration roots from native drag-region collection. Their interactive descendants, score popup, and menus keep the normal control exclusions; other overlays and platforms are unchanged.
+
 ### What boot looks like
 
 Boot runs in two stages: the module stage adopts the parser-loaded bootstrap batch, builds the module system from the Host-provided boot graph, and prefetches the `immediately` tier through the shared application-batch URL, which executes once. The plugin stage then activates every graph entry and waits for all of them before handing the marked boot DOM to the UI renderer, which hydrates it and switches to the complete UI.

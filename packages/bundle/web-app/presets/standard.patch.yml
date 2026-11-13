@@ -18,6 +18,10 @@
               maxBytes: 65536
           - id: time-context
             name: '@deepseek-ai/dsh-time-context'
+            # This fork's sessions keep the clock reading and the elapsed-time
+            # line but drop the browser time-zone policy line.
+            config:
+              includeTimeZone: false
           - id: tool-bash
             name: '@deepseek-ai/dsh-tool-bash'
             disabled: !!js process.platform === 'win32'

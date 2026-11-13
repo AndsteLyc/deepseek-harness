@@ -25,6 +25,8 @@
 
     - id: time-context
       name: '@deepseek-ai/dsh-time-context'
+      config:
+        includeTimeZone: !!js process.env.TIME_CONTEXT_TEST_INCLUDE_ZONE !== 'false'
 
 - id: sandbox-policy
   inject: []

@@ -79,6 +79,16 @@ describe('web shell base.css', () => {
     )
   })
 
+  it('excludes only the two macOS pet decoration roots from native region collection', () => {
+    expect(normalizedCss).toContain(
+      "html[data-platform='darwin'] body > #dsh-pet-baifan-root, "
+      + "html[data-platform='darwin'] body > .dsh-pet-score-burst { -webkit-app-region: initial !important; }",
+    )
+    expect(normalizedCss).toContain(
+      "html[data-platform='darwin'] body > :not(#root) { -webkit-app-region: no-drag; }",
+    )
+  })
+
   it('auto-spaces prose while preserving literal content', () => {
     expect(baseCss).toMatch(/body\s*\{[^}]*text-autospace:\s*normal;/)
     expect(normalizedCss).toContain(
