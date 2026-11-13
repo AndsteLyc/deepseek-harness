@@ -17,7 +17,7 @@ on:
         default: custom
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: fork-package-macos
@@ -61,3 +61,22 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+      - name: Publish rolling fork release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          version="$(node -p "require('./package.json').version")"
+          artifact="$(ls apps/desktop/.desktop-build/targets/mac-x64/unsigned-artifacts/*.dmg)"
+          staged="$RUNNER_TEMP/dsh-fork-latest-mac-x64-unsigned.dmg"
+          cp "$artifact" "$staged"
+          tag="fork-latest"
+          title="Fork latest · ${version}"
+          notes="Automated unsigned macOS x64 build from the custom branch (run ${GITHUB_RUN_NUMBER})."
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" "$staged" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release edit "$tag" --title "$title" --notes "$notes" --latest --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$tag" "$staged" --title "$title" --notes "$notes" --latest --repo "$GITHUB_REPOSITORY"
+          fi
