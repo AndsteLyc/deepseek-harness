@@ -1,0 +1,145 @@
+name: Fork · Sync upstream
+
+on:
+  schedule:
+    # GitHub cron runs in UTC; 02:17 UTC is 10:17 Asia/Shanghai.
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      build:
+        description: '同步后强制构建一次 macOS 安装包'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: fork-sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync-master:
+    name: Sync master from upstream
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.sync.outputs.changed }}
+    steps:
+      - name: Check out master
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge upstream master
+        id: sync
+        run: |
+          set -eu
+          git remote add upstream https://github.com/deepseek-ai/deepseek-harness.git
+          git fetch --no-tags upstream master
+          before="$(git rev-parse HEAD)"
+          if ! git merge --no-edit upstream/master; then
+            git merge --abort || true
+            exit 1
+          fi
+          # GITHUB_TOKEN cannot push workflow files. Keep the fork-owned .github tree so
+          # upstream CI changes never enter this branch; product code still follows upstream.
+          rm -rf .github
+          git checkout "$before" -- .github
+          git add -A .github
+          if ! git diff --cached --quiet; then
+            git commit --amend --no-edit
+          fi
+          after="$(git rev-parse HEAD)"
+          if [ "$before" = "$after" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git push origin HEAD:master
+          fi
+
+      - name: Report master conflict
+        if: failure() && steps.sync.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          title="[fork-sync] master 与上游合并冲突"
+          body="$(printf '自动同步 master 时发生冲突，工作流已停止。\n\n运行记录：%s\n\n请在本机解决后重新运行工作流。' "$RUN_URL")"
+          existing="$(gh issue list --state open --search 'fork-sync master 合并冲突 in:title' --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
+
+  sync-custom:
+    name: Merge master into custom
+    needs: sync-master
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.sync.outputs.updated }}
+    steps:
+      - name: Check out custom
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: custom
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge master into custom
+        id: sync
+        run: |
+          set -eu
+          git fetch origin master
+          before="$(git rev-parse HEAD)"
+          if ! git merge --no-edit origin/master; then
+            git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt" || true
+            git merge --abort || true
+            exit 1
+          fi
+          after="$(git rev-parse HEAD)"
+          if [ "$before" = "$after" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+            git push origin HEAD:custom
+          fi
+
+      - name: Report custom conflict
+        if: failure() && steps.sync.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          title="[fork-sync] custom 与 master 合并冲突"
+          conflicts="$(cat "$RUNNER_TEMP/conflicts.txt" 2>/dev/null | sed 's/^/- /' || true)"
+          body="$(printf '自动把 master 合并到 custom 时发生冲突，工作流已停止，未推送 custom。\n\n运行记录：%s\n\n冲突文件：\n%s\n\n请在本机解决后重新运行工作流。' "$RUN_URL" "${conflicts:-（未记录）}")"
+          existing="$(gh issue list --state open --search 'fork-sync custom 合并冲突 in:title' --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
+
+  package:
+    name: Package macOS x64
+    needs: sync-custom
+    if: needs.sync-custom.outputs.updated == 'true' || (github.event_name == 'workflow_dispatch' && inputs.build)
+    permissions:
+      contents: read
+    uses: ./.github/workflows/fork-package-macos.yml
+    with:
+      ref: custom
