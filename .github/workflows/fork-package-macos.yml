@@ -90,9 +90,15 @@ jobs:
               runId: process.env.RUN_ID,
             }, null, 2) + "\n");
           '
+          versioned_tag="fork-v${version}-r${GITHUB_RUN_NUMBER}"
+          versioned_title="Fork build · ${version} · run ${GITHUB_RUN_NUMBER}"
+          versioned_notes="Immutable unsigned macOS x64 build from commit ${commit} at ${built_at}."
+          if ! gh release view "$versioned_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$versioned_tag" "$staged" "$manifest" --title "$versioned_title" --notes "$versioned_notes" --latest=false --repo "$GITHUB_REPOSITORY"
+          fi
           tag="fork-latest"
           title="Fork latest · ${version}"
-          notes="Automated unsigned macOS x64 build from the custom branch (run ${GITHUB_RUN_NUMBER})."
+          notes="Rolling unsigned macOS x64 build from the custom branch (run ${GITHUB_RUN_NUMBER}). Immutable build: ${versioned_tag}."
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" "$staged" "$manifest" --clobber --repo "$GITHUB_REPOSITORY"
             gh release edit "$tag" --title "$title" --notes "$notes" --latest --repo "$GITHUB_REPOSITORY"
