@@ -1,6 +1,8 @@
 name: Fork · Package macOS x64
 
 on:
+  push:
+    branches: [custom]
   workflow_call:
     inputs:
       ref:
