@@ -70,13 +70,30 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           artifact="$(ls apps/desktop/.desktop-build/targets/mac-x64/unsigned-artifacts/*.dmg)"
           staged="$RUNNER_TEMP/dsh-fork-latest-mac-x64-unsigned.dmg"
+          manifest="$RUNNER_TEMP/fork-latest.json"
           cp "$artifact" "$staged"
+          sha512="$(shasum -a 512 "$staged" | awk '{print $1}')"
+          size="$(stat -f%z "$staged")"
+          commit="$(git rev-parse HEAD)"
+          built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          MANIFEST_PATH="$manifest" ASSET_NAME="dsh-fork-latest-mac-x64-unsigned.dmg" VERSION="$version" SHA512="$sha512" SIZE="$size" COMMIT="$commit" BUILT_AT="$built_at" RUN_ID="$GITHUB_RUN_ID" node -e '
+            const fs = require("node:fs");
+            fs.writeFileSync(process.env.MANIFEST_PATH, JSON.stringify({
+              version: process.env.VERSION,
+              commit: process.env.COMMIT,
+              sha512: process.env.SHA512,
+              size: Number(process.env.SIZE),
+              assetName: process.env.ASSET_NAME,
+              builtAt: process.env.BUILT_AT,
+              runId: process.env.RUN_ID,
+            }, null, 2) + "\n");
+          '
           tag="fork-latest"
           title="Fork latest · ${version}"
           notes="Automated unsigned macOS x64 build from the custom branch (run ${GITHUB_RUN_NUMBER})."
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" "$staged" --clobber --repo "$GITHUB_REPOSITORY"
+            gh release upload "$tag" "$staged" "$manifest" --clobber --repo "$GITHUB_REPOSITORY"
             gh release edit "$tag" --title "$title" --notes "$notes" --latest --repo "$GITHUB_REPOSITORY"
           else
-            gh release create "$tag" "$staged" --title "$title" --notes "$notes" --latest --repo "$GITHUB_REPOSITORY"
+            gh release create "$tag" "$staged" "$manifest" --title "$title" --notes "$notes" --latest --repo "$GITHUB_REPOSITORY"
           fi
