@@ -29,7 +29,7 @@ Mount this plugin when the model should interpret unqualified dates and times in
 
 ### What the model gets
 
-Each injected reading has three lines: an ISO-shaped timestamp with numeric offset and IANA zone, the browser-zone policy for the request, and the elapsed duration in compact whole-second units. Step 1 measures from the latest preceding model-visible message; later steps measure from the preceding time-context event in the same turn. A missing baseline reports `unavailable`, and backward wall-clock movement clamps elapsed time to zero. The policy line is optional: `includeTimeZone: false` keeps the timestamp and the elapsed duration only. The `standard` preset sets this to `false`; the plugin itself defaults to `true`.
+Each injected reading has three lines: an ISO-shaped timestamp with numeric offset and IANA zone, the browser-zone policy for the request, and the elapsed duration in compact whole-second units. Step 1 measures from the latest preceding model-visible message; later steps measure from the preceding time-context event in the same turn. A missing baseline reports `unavailable`, and backward wall-clock movement clamps elapsed time to zero. The policy line is optional: `includeTimeZone: false` keeps the timestamp and the elapsed duration only. The `standard` preset sets this to `false` and pins the clock to `Asia/Singapore` with `overrideTimeZone`; the plugin itself defaults to `true` and no override.
 
 ### Configuration
 
@@ -44,6 +44,7 @@ The minimal mount needs no configuration. A positive `refreshIntervalMs` suppres
 | Field | Default | Meaning |
 |---|---|---|
 | `timeZone` | process zone | Fallback display zone when the open turn has no unique browser zone |
+| `overrideTimeZone` | unset | Force this zone for the clock timestamp, overriding the reported browser zone |
 | `includeTimeZone` | `true` | Append the browser-zone policy line; `false` keeps the timestamp and elapsed duration only |
 | `refreshIntervalMs` | `600000` (10 minutes) | Minimum milliseconds between durable injections in one session |
 
@@ -51,7 +52,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### Choosing the zone
 
-When the open turn contains exactly one Host-validated browser zone, the timestamp is formatted in that request-local zone. With missing or mixed browser-zone records, the configured `timeZone` formats the display; omitting it resolves the Node process zone once at plugin load, and every explicit fallback is validated through `Intl.DateTimeFormat`. The resolved instruction tells the model to interpret unqualified dates and times in the chosen zone, and to ask the user to clarify when those records are mixed or unavailable. With `includeTimeZone: false`, the model receives neither the unqualified-time instruction nor the clarification instruction; the timestamp still includes its numeric offset and IANA zone.
+When the open turn contains exactly one Host-validated browser zone, the timestamp is formatted in that request-local zone. With missing or mixed browser-zone records, the configured `timeZone` formats the display; omitting it resolves the Node process zone once at plugin load, and every explicit fallback is validated through `Intl.DateTimeFormat`. The resolved instruction tells the model to interpret unqualified dates and times in the chosen zone, and to ask the user to clarify when those records are mixed or unavailable. With `includeTimeZone: false`, the model receives neither the unqualified-time instruction nor the clarification instruction; the timestamp still includes its numeric offset and IANA zone. With `overrideTimeZone`, the timestamp uses that zone instead of the request-local browser zone or the fallback; the browser-zone facts still drive the optional policy line.
 
 -----
 
@@ -142,6 +143,7 @@ These limits define when clock context is a poor fit. They are current package c
 - **Fallback is not user authority** — the configured or process zone formats the clock when current-turn browser zones are missing or mixed; the clarification policy is included only with `includeTimeZone: true`.
 - **Whole-second display** — timestamps and durations omit sub-second precision even though durable event times retain milliseconds.
 - **History cost between compactions** — `0` retains one reading for every eligible attempt; a positive interval reduces but does not eliminate this cost and may leave a later request without fresh browser-zone guidance.
+- **Override bypasses the browser zone** — `overrideTimeZone` fixes the clock label for every request. When a session spans users in different zones, the timestamp no longer follows the browser while the optional policy line still reports the browser zone.
 
 <a id="dev-note"></a>
 ### Dev Note

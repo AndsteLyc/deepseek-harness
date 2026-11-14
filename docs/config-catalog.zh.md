@@ -4121,6 +4121,12 @@ export interface Config {
   /** Fallback display zone when the open turn has no unique browser zone. Omit to use the process zone. */
   timeZone?: string
   /**
+   * Force this IANA zone for the clock timestamp, overriding the browser zone reported for the open
+   * request. Omit to keep browser-zone precedence with `timeZone` or the process zone as fallback.
+   * The timestamp still names this zone when the browser policy line is omitted.
+   */
+  overrideTimeZone?: string
+  /**
    * Append the browser time-zone policy line that tells the model which zone owns unqualified times.
    * Defaults to true; false keeps only the timestamp and elapsed lines, while the timestamp still names
    * the zone it was formatted in. A mixed or missing browser zone then reaches the model as no policy at

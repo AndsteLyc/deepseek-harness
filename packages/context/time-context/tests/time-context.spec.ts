@@ -282,6 +282,22 @@ describe('durable step context', () => {
     )
   })
 
+  it('uses overrideTimeZone for the clock instead of the reported browser zone', async () => {
+    const { ctx } = await mount({
+      overrideTimeZone: 'Asia/Singapore', includeTimeZone: false, refreshIntervalMs: 0,
+    })
+    const session = Session.create(brandString<SessionId>('override-zone'))
+    openMessageTurn(session, 1, 'America/New_York')
+    vi.setSystemTime(BASE + 90_061_000)
+
+    await fire(ctx, sessionAgent(session), 1, 1)
+
+    expect(contextTexts(session)[0]).toBe(
+      'Time sampled while preparing turn 1, step 1: 2026-07-15T09:01:01+08:00[Asia/Singapore]\n'
+      + 'Elapsed since the preceding model-visible message: 1d 1h 1m 1s.',
+    )
+  })
+
   it('reports an unavailable later-step baseline at the matching turn boundary', async () => {
     const { ctx } = await mount()
     const session = Session.create(brandString<SessionId>('later-step-boundary'))
@@ -425,6 +441,15 @@ describe('configuration and lifecycle', () => {
     await unresolved.plugin(SessionProjectionRegistry)
     await unresolved.plugin(AgentRegistry)
     await expect(unresolved.plugin(timeContext, {})).rejects.toThrow(/failed to resolve the system time zone/)
+  })
+
+  it('fails loud for an invalid overrideTimeZone at plugin load', async () => {
+    const invalid = new Context()
+    await invalid.plugin(SessionProjectionRegistry)
+    await invalid.plugin(AgentRegistry)
+    await expect(invalid.plugin(timeContext, { overrideTimeZone: 'Not/A_Real_Zone' })).rejects.toThrow(
+      /invalid IANA overrideTimeZone/,
+    )
   })
 
   it('rejects invalid refresh intervals at plugin load with one diagnostic', async () => {

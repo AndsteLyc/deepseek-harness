@@ -21,7 +21,7 @@ async function journalPaths(dir: string): Promise<string[]> {
 
 function expectClockOnly(text: string): void {
   expect(text.split('\n')).toHaveLength(2)
-  expect(text).toMatch(/^Time sampled while preparing turn 1, step 1: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00\[Asia\/Shanghai\]\n/)
+  expect(text).toMatch(/^Time sampled while preparing turn 1, step 1: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00\[Asia\/Singapore\]\n/)
   expect(text).toContain('Elapsed since the preceding model-visible message:')
   expect(text).not.toContain('Browser time zone for this request:')
 }
