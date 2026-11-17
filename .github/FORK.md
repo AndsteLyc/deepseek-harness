@@ -18,6 +18,6 @@ GitHub schedules require this workflow on the repository's default branch. Set t
 
 ## Validation and history
 
-Run `node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs` and `node .github/scripts/verify-release-base.mjs` from the repository root. Packaging checks its baseline before dependency installation and publishes only after the packaged runtime smoke checks succeed.
+Fetch the declared baseline tag from the official repository before local checks; both workflows do this explicitly. Run `node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs` and `node .github/scripts/verify-release-base.mjs` from the repository root. Packaging checks its baseline before dependency installation and publishes only after the packaged runtime smoke checks succeed.
 
 The initial baseline adjustment is an ordinary commit on `custom`; previous commits remain in Git history. Commit counts therefore include earlier upstream merges and do not describe the current source differences from the official release.

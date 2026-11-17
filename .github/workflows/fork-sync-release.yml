@@ -39,6 +39,11 @@ jobs:
           node-version: '24'
           cache: pnpm
 
+      - name: Fetch pinned official release tag
+        run: |
+          tag="$(node -p "require('./.github/fork-release.json').upstreamTag")"
+          git fetch --no-tags https://github.com/deepseek-ai/deepseek-harness.git "refs/tags/$tag:refs/tags/$tag"
+
       - name: Install current dependencies
         run: pnpm install --frozen-lockfile
 

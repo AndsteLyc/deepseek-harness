@@ -18,6 +18,6 @@ GitHub 定时任务要求工作流位于仓库默认分支。将默认分支设�
 
 ## 验证与历史
 
-在仓库根目录运行 `node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs` 和 `node .github/scripts/verify-release-base.mjs`。打包流程在安装依赖前检查基线，并在打包后的运行时冒烟检查成功后才发布。
+本地检查前，先从官方仓库获取声明中的基线标签；两条工作流会显式执行这一步。在仓库根目录运行 `node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs` 和 `node .github/scripts/verify-release-base.mjs`。打包流程在安装依赖前检查基线，并在打包后的运行时冒烟检查成功后才发布。
 
 首次基线调整使用 `custom` 上的普通提交，之前的提交保留在 Git 历史中。因此，提交数量仍包含之前合并的上游历史，不能用来表示当前源码与官方发布版本的差异。

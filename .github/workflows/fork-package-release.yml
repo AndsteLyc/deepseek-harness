@@ -57,10 +57,30 @@ jobs:
           node-version: '24'
           cache: 'pnpm'
 
+      - name: Fetch pinned official release tag
+        run: |
+          tag="$(node -p "require('./.github/fork-release.json').upstreamTag")"
+          git fetch --no-tags https://github.com/deepseek-ai/deepseek-harness.git "refs/tags/$tag:refs/tags/$tag"
+
       - name: Verify official release baseline
         run: |
-          node --test .github/scripts/verify-release-base.test.mjs
-          node .github/scripts/verify-release-base.mjs
+          node --input-type=module <<'JS'
+          import { spawnSync } from 'node:child_process'
+          for (const args of [
+            ['--test', '.github/scripts/verify-release-base.test.mjs'],
+            ['.github/scripts/verify-release-base.mjs'],
+          ]) {
+            const result = spawnSync(process.execPath, args, { encoding: 'utf8' })
+            process.stdout.write(result.stdout ?? '')
+            process.stderr.write(result.stderr ?? '')
+            if (result.status !== 0) {
+              const diagnostic = `${result.error?.message ?? ''}\n${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim()
+              const annotation = diagnostic.slice(-24000).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
+              console.log(`::error title=Official release baseline::${annotation}`)
+              process.exit(result.status ?? 1)
+            }
+          }
+          JS
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
