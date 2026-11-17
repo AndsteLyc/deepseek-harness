@@ -75,12 +75,27 @@ jobs:
 
       - uses: pnpm/action-setup@v5.0.0
         with:
-          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - name: Configure stable pnpm store
+        run: pnpm config set store-dir "$RUNNER_TEMP/dsh-pnpm-store" --global
 
       - uses: actions/setup-node@v7.0.0
         with:
           node-version: '24'
           cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Restore desktop dependency and download caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            apps/desktop/.desktop-build/downloads
+            apps/desktop/.desktop-build/pnpm-store
+            ~/Library/Caches/electron-builder
+          key: desktop-runtime-${{ runner.os }}-${{ runner.arch }}-v1-${{ hashFiles('pnpm-lock.yaml', 'scripts/primary-runtime/**', 'apps/desktop/package.json') }}
+          restore-keys: |
+            desktop-runtime-${{ runner.os }}-${{ runner.arch }}-v1-
 
       - name: Fetch pinned official release tag
         run: |
@@ -110,10 +125,28 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Record packaging host resources
+        run: bash .github/scripts/macos-package-diagnostics.sh snapshot .local/packaging-diagnostics/before.log
+
       - name: Build unsigned macOS x64 package
+        id: package
         env:
           DSH_TELEMETRY_DISABLED: '1'
-        run: pnpm run package:desktop:mac:x64:unsigned
+        run: bash .github/scripts/macos-package-diagnostics.sh run .local/packaging-diagnostics/time.log pnpm run package:desktop:mac:x64:unsigned
+
+      - name: Record packaging host resources after build
+        if: ${{ always() && steps.package.outcome != '' && steps.package.outcome != 'skipped' }}
+        run: bash .github/scripts/macos-package-diagnostics.sh snapshot .local/packaging-diagnostics/after.log
+
+      - name: Upload packaging diagnostics
+        if: ${{ always() && steps.package.outcome != '' && steps.package.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: dsh-packaging-diagnostics-${{ github.run_number }}-${{ github.run_attempt }}
+          path: .local/packaging-diagnostics/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload DMG
         uses: actions/upload-artifact@v7.0.1

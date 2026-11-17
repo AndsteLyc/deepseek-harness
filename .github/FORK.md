@@ -16,6 +16,12 @@ The synchronizer applies the product changes from the old official release to th
 
 GitHub schedules require this workflow on the repository's default branch. Set the default branch to `custom` to activate the six-hour check. The packaging job disables both legacy workflows, whose default-branch copies could otherwise merge development code or publish it without the release check. The disabled legacy sync workflow cannot be manually dispatched; synchronization of the separate `master` mirror then requires local Git.
 
+## Packaging caches and diagnostics
+
+Both release workflows configure a stable pnpm store before restoring the lockfile-keyed dependency cache. Packaging also caches Desktop's downloaded runtime archives, its separate pnpm store, and electron-builder tools. Desktop cache keys separate operating systems and architectures; lockfile or runtime input changes create a new entry, with older entries available for reuse of unchanged downloads and dependencies. Compiled outputs and installation packages are rebuilt.
+
+The macOS packaging job records host CPU and memory information, swap usage, free disk space, and disk I/O before and after the build. Its `time.log` records command CPU time, elapsed time, peak resident memory, and I/O counters. Resource reports exclude command output and environment variables; command output remains in the Actions log. The `dsh-packaging-diagnostics` artifact is retained for 14 days and uploaded after successful or failed build execution. Compare it with the build-stage timings in the Actions log when investigating slow runs. Cache reuse and its effect on duration require a subsequent Actions run to verify.
+
 ## Validation and history
 
 Fetch the declared baseline tag from the official repository before local checks; both workflows do this explicitly. Run `node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs` and `node .github/scripts/verify-release-base.mjs` from the repository root. Packaging checks its baseline before dependency installation and publishes only after the packaged runtime smoke checks succeed.
