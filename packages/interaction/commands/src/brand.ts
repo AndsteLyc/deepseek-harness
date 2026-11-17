@@ -1,4 +1,13 @@
-/** Standalone command identities and compatibility constructors, without Cordis registration effects. */
+/**
+ * Command definition identities and execution ids for discovery and lifecycle pairing.
+ *
+ * The `Branded<B>` primitive lives in `@deepseek-ai/dsh-brand`; this module
+ * is a pure type/constructor outlet (no cordis imports, no module
+ * augmentation) so wire and client programs can name the brand without
+ * loading the host plugin's Context merges — the `dsh-llm/brand` shape.
+ *
+ * @module @deepseek-ai/dsh-commands/brand
+ */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
 

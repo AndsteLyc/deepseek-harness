@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import ApprovalService, { type ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import { makeBridgeHarness, type BridgeHarness } from './harness.ts'
 
@@ -20,11 +19,11 @@ describe('ACP machine permission policy', () => {
     await harness.ctx.plugin(ApprovalService)
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const { sessionId } = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
-    const agent = harness.ctx.agents.get(brandString<SessionId>(sessionId))!
+    const agent = harness.ctx.agents.get(SessionId(sessionId))!
     agent.session.append('turn/start', { turn: 1 })
     agent.session.append('step/start', { turn: 1, step: 1 })
-    agent.session.append('tool/call', { turn: 1, step: 1, callId: brandString<ToolCallId>('call-9'), name: 'bash', arguments: '{}' })
-    return { agent, toolName: 'bash', callId: brandString<ToolCallId>('call-9'), ...overrides }
+    agent.session.append('tool/call', { turn: 1, step: 1, callId: ToolCallId('call-9'), name: 'bash', arguments: '{}' })
+    return { agent, toolName: 'bash', callId: ToolCallId('call-9'), ...overrides }
   }
 
   it('maps the two advertised one-shot choices', async () => {
@@ -79,7 +78,7 @@ describe('ACP machine permission policy', () => {
         append: () => ({}),
       },
     } as unknown as Agent
-    await expect(harness.ctx.approval.request({ agent: foreign, toolName: 'bash', callId: brandString<ToolCallId>('call') }))
+    await expect(harness.ctx.approval.request({ agent: foreign, toolName: 'bash', callId: ToolCallId('call') }))
       .resolves.toBe('unavailable')
     expect(harness.permissionRequests).toHaveLength(0)
   })

@@ -9,9 +9,6 @@
   ],
   "references": [
     {
-      "path": "../../util/text-search"
-    },
-    {
       "path": "../../api/session-controller/tsconfig.client.json"
     },
     {

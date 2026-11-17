@@ -4,9 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { Sharp } from 'sharp'
-import { AttachmentError } from '@deepseek-ai/dsh-attachment'
-import type { ImageVariantId } from '@deepseek-ai/dsh-attachment/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { AttachmentError, ImageVariantId } from '@deepseek-ai/dsh-attachment'
 import type {
   ImageMediaType,
   ImageAttachmentRef,
@@ -81,8 +79,8 @@ function descriptor(attachment: ImageAttachmentRef, target: ImageRequestTarget):
 export function requestImageVariantId(
   attachment: ImageAttachmentRef,
   target: ImageRequestTarget,
-): ImageVariantId {
-  return brandString<ImageVariantId>(`sha256:${digest(descriptor(attachment, target))}`)
+): ReturnType<typeof ImageVariantId> {
+  return ImageVariantId(`sha256:${digest(descriptor(attachment, target))}`)
 }
 
 /** Resize by the source long edge only, so the encoder derives the short edge as the route predicts. */

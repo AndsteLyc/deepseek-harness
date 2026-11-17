@@ -8,14 +8,13 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createUserMessage, LlmAdapter } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import Storage from '@deepseek-ai/dsh-storage'
 import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
 import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import ScheduleService from '../src/index.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 /** A rule whose only occurrence lies beyond every test run, so no delivery competes with the notices. */
 const distant = 'DTSTART:20990101T000000Z\nRRULE:FREQ=DAILY;COUNT=1'
@@ -58,7 +57,7 @@ async function setup() {
   await ctx.plugin(ScheduleService)
   const adapter = new ReplyAdapter()
   ctx.llm.registerAdapter(['mock'], adapter)
-  const agent = await ctx.agentLoop.create(brandString<SessionId>('notified'), { provider: 'mock', model: 'mock' })
+  const agent = await ctx.agentLoop.create(SessionId('notified'), { provider: 'mock', model: 'mock' })
   return { service: ctx.schedule, adapter, agent }
 }
 
@@ -78,7 +77,7 @@ it('adds notices queued while the Agent is idle to the first step of its next tu
   const { service, adapter, agent } = await setup()
   const created = await service.create({
     title: 'Standup', prompt: 'Prompt', timing: { kind: 'rrule', rrule: distant }, target: { kind: 'session', sessionId: agent.session.id },
-  }, brandString<SessionId>('actor'))
+  }, SessionId('actor'))
   await service.edit({ id: created.id, action: 'update', patch: { active: false } })
   await vi.waitFor(() => { expect(agent.inbox.nextStep).toHaveLength(2) })
   expect(agent.inbox.nextTurn).toEqual([])

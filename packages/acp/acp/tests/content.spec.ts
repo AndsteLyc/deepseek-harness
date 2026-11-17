@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
-import { AttachmentError } from '@deepseek-ai/dsh-attachment'
-import type { AttachmentId } from '@deepseek-ai/dsh-attachment/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { AttachmentError, AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type { ModelSelection } from '@deepseek-ai/dsh-agent'
 import {
@@ -13,7 +11,7 @@ import {
 } from '../src/content.ts'
 
 const REF: ImageAttachmentRef = {
-  attachmentId: brandString<AttachmentId>(`sha256:${'1'.repeat(64)}`),
+  attachmentId: AttachmentId(`sha256:${'1'.repeat(64)}`),
   mediaType: 'image/png',
   bytes: 1,
   width: 1,
@@ -35,7 +33,7 @@ function admissionFixture(options: {
 } = {}): AdmissionFixture {
   const saveImages = vi.fn(async (inputs: readonly SaveImageAttachment[]) => inputs.map((input, index) => ({
     ...REF,
-    attachmentId: brandString<AttachmentId>(`sha256:${String(index + 1).padStart(64, '0')}`),
+    attachmentId: AttachmentId(`sha256:${String(index + 1).padStart(64, '0')}`),
     mediaType: input.mediaType,
     bytes: input.data.byteLength,
   })))

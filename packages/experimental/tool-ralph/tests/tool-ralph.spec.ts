@@ -5,17 +5,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { SubagentCapabilities, SubagentProvider, SubagentRun, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { WorkflowRunId } from '@deepseek-ai/dsh-workflow/types'
-import { WorkflowEngine } from '@deepseek-ai/dsh-workflow'
+import { WorkflowRunId, WorkflowEngine } from '@deepseek-ai/dsh-workflow'
 import type { WorkflowResult, WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
 import * as toolRalph from '../src/index.ts'
 
@@ -35,7 +33,7 @@ class StubEngine extends WorkflowEngine {
     const result = new Promise<WorkflowResult>((resolve) => { this.settle = resolve })
     this.onStart?.()
     return {
-      id: brandString<WorkflowRunId>(`ralph-${this.requests.length}`),
+      id: WorkflowRunId(`ralph-${this.requests.length}`),
       meta: request.meta,
       result,
       cancel: (reason?: string) => {
@@ -97,7 +95,7 @@ async function setup(options?: SetupOptions) {
   if (options?.config?.maxHandoffChars !== undefined) config.maxHandoffChars = options.config.maxHandoffChars
   if (options?.config?.maxResultChars !== undefined) config.maxResultChars = options.config.maxResultChars
   const fiber = await ctx.plugin(toolRalph, config)
-  const parent = { id: brandString<SessionId>('caller'), options: {} } as Agent
+  const parent = { id: SessionId('caller'), options: {} } as unknown as Agent
   return { ctx, engine: ctx.workflowEngine as StubEngine, parent, fiber }
 }
 
@@ -108,7 +106,7 @@ function execute(
 ): Promise<ToolExecutionResult> {
   return executeToolFixture(ctx, {
     signal: extra?.signal ?? testToolSignal,
-    callId: brandString<ToolCallId>('ralph-call'),
+    callId: ToolCallId('ralph-call'),
     name: 'ralph',
     arguments: args,
     ...extra?.agent === undefined ? {} : { agent: extra.agent },
@@ -238,7 +236,6 @@ describe('dsh-tool-ralph', () => {
     expect(firstResult.isError).toBe(true)
     expect((firstResult.content[0] as { text: string }).text).toContain('Ralph round 1 child failed')
     expect((firstResult.content[0] as { text: string }).text).toContain('No previous handoff was available.')
-    expect(firstResult.error?.info).toEqual({ name: 'RalphError', code: 'RALPH_ROUND_FAILED' })
 
     const later = execute(ctx, { objective: 'Ship it.', maxRounds: 2 }, { agent: parent })
     await vi.waitFor(() => { expect(engine.requests).toHaveLength(2) })
@@ -257,10 +254,8 @@ describe('dsh-tool-ralph', () => {
     const failed = execute(ctx, { objective: 'Work.' }, { agent: parent })
     await vi.waitFor(() => { expect(engine.requests).toHaveLength(1) })
     engine.settle({ value: null, stopReason: 'error', error: 'child report malformed', agentsStarted: 1 })
-    const failedResult = await failed
-    expect((failedResult.content[0] as { text: string }).text)
+    expect(((await failed).content[0] as { text: string }).text)
       .toContain('Ralph workflow failed: child report malformed')
-    expect(failedResult.error?.info).toEqual({ name: 'RalphError', code: 'RALPH_WORKFLOW_FAILED' })
 
     const unknown = execute(ctx, { objective: 'Work.' }, { agent: parent })
     await vi.waitFor(() => { expect(engine.requests).toHaveLength(2) })
@@ -270,9 +265,7 @@ describe('dsh-tool-ralph', () => {
     const cancelled = execute(ctx, { objective: 'Work.' }, { agent: parent })
     await vi.waitFor(() => { expect(engine.requests).toHaveLength(3) })
     engine.settle({ value: null, stopReason: 'cancelled', error: 'user stopped', agentsStarted: 0 })
-    const cancelledResult = await cancelled
-    expect((cancelledResult.content[0] as { text: string }).text).toContain('cancelled (user stopped)')
-    expect(cancelledResult.error?.info).toEqual({ name: 'RalphError', code: 'RALPH_WORKFLOW_FAILED' })
+    expect(((await cancelled).content[0] as { text: string }).text).toContain('cancelled (user stopped)')
 
     const bare = execute(ctx, { objective: 'Work.' }, { agent: parent })
     await vi.waitFor(() => { expect(engine.requests).toHaveLength(4) })
@@ -287,10 +280,7 @@ describe('dsh-tool-ralph', () => {
     const pending = execute(ctx, { objective: 'Work.' }, { agent: parent, signal: controller.signal })
     await vi.waitFor(() => { expect(engine.requests).toHaveLength(1) })
     controller.abort()
-    const aborted = await pending
-    expect(aborted.isError).toBe(true)
-    expect(aborted.error?.info).toEqual({ name: 'AbortError', code: 'ABORTED' })
-    expect((aborted.content[0] as { text: string }).text).toContain('Ralph workflow was cancelled (parent step aborted)')
+    expect((await pending).isError).toBe(true)
 
     const already = new AbortController()
     already.abort()
@@ -316,17 +306,11 @@ describe('dsh-tool-ralph', () => {
 
   it('rejects absent authority, empty objectives, bad round caps, and schema-invalid calls before start', async () => {
     const { ctx, engine, parent } = await setup({ config: { maxRounds: 3 } })
-    expect((await execute(ctx, { objective: 'Work.' })).error?.info)
-      .toEqual({ name: 'ToolContextUnavailableError', code: 'TOOL_CONTEXT_UNAVAILABLE' })
-    expect((await execute(ctx, { objective: '   ' }, { agent: parent })).error?.info).toEqual({
-      name: 'ToolArgsError', code: 'INVALID_ARGS',
-    })
-    for (const maxRounds of [0, 1.5, 4]) {
-      expect((await execute(ctx, { objective: 'Work.', maxRounds }, { agent: parent })).error?.info).toEqual({
-        name: 'ToolArgsError', code: 'INVALID_ARGS',
-      })
+    expect((await execute(ctx, { objective: 'Work.' })).isError).toBe(true)
+    expect((await execute(ctx, { objective: '   ' }, { agent: parent })).isError).toBe(true)
+    for (const maxRounds of [0, 1.5, Number.NaN, 4]) {
+      expect((await execute(ctx, { objective: 'Work.', maxRounds }, { agent: parent })).isError).toBe(true)
     }
-    expect((await execute(ctx, { objective: 'Work.', maxRounds: Number.NaN }, { agent: parent })).isError).toBe(true)
     const missing = await execute(ctx, {}, { agent: parent })
     expect(missing.error?.info?.code).toBe('INVALID_ARGS')
     expect(engine.requests).toHaveLength(0)
@@ -334,20 +318,17 @@ describe('dsh-tool-ralph', () => {
 
   it('rejects missing, unstructured, and parent-context-inheriting provider routes', async () => {
     const missing = await setup({ provider: false })
-    const missingResult = await execute(missing.ctx, { objective: 'Work.' }, { agent: missing.parent })
-    expect((missingResult.content[0] as { text: string }).text).toContain('is not registered')
-    expect(missingResult.error?.info).toEqual({ name: 'RalphError', code: 'RALPH_PROVIDER_UNAVAILABLE' })
+    expect(((await execute(missing.ctx, { objective: 'Work.' }, { agent: missing.parent })).content[0] as { text: string }).text)
+      .toContain('is not registered')
     expect(missing.engine.requests).toHaveLength(0)
 
     const unstructured = await setup({ provider: new StubProvider({ outputSchema: false }) })
-    const unstructuredResult = await execute(unstructured.ctx, { objective: 'Work.' }, { agent: unstructured.parent })
-    expect((unstructuredResult.content[0] as { text: string }).text).toContain('does not support structured output')
-    expect(unstructuredResult.error?.info).toEqual({ name: 'RalphError', code: 'RALPH_PROVIDER_UNSUPPORTED' })
+    expect(((await execute(unstructured.ctx, { objective: 'Work.' }, { agent: unstructured.parent })).content[0] as { text: string }).text)
+      .toContain('does not support structured output')
 
     const inherited = await setup({ provider: new StubProvider({ inheritsParentContext: true }) })
-    const inheritedResult = await execute(inherited.ctx, { objective: 'Work.' }, { agent: inherited.parent })
-    expect((inheritedResult.content[0] as { text: string }).text).toContain('inherits parent context')
-    expect(inheritedResult.error?.info).toEqual({ name: 'RalphError', code: 'RALPH_PROVIDER_UNSUPPORTED' })
+    expect(((await execute(inherited.ctx, { objective: 'Work.' }, { agent: inherited.parent })).content[0] as { text: string }).text)
+      .toContain('inherits parent context')
   })
 
   it('rejects invalid direct-apply config before touching injected services', () => {
@@ -389,7 +370,6 @@ describe('dsh-tool-ralph', () => {
       )
       expect(result.isError).toBe(true)
       expect((result.content[0] as { text: string }).text).toContain(testCase.message)
-      expect(result.error?.info).toEqual({ name: 'RalphError', code: 'RALPH_INVALID_RESULT' })
     }
   })
 

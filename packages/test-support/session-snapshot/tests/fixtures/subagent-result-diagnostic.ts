@@ -6,8 +6,7 @@ import {
   type SubagentStartRequest,
   type SubagentProvider,
 } from '@deepseek-ai/dsh-subagent'
-import type { SessionId } from '@deepseek-ai/dsh-session'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { SessionId } from '@deepseek-ai/dsh-session'
 
 export const name = 'subagent-result-diagnostic'
 export const inject = ['subagents']
@@ -48,7 +47,7 @@ class DiagnosticProvider implements SubagentProvider {
     const index = this.starts++
     if (index === RESULTS.length) {
       return {
-        id: brandString<SessionId>('00000000-0000-4000-8000-0000000000d5'),
+        id: SessionId('00000000-0000-4000-8000-0000000000d5'),
         result: Promise.resolve({
           output: [{ type: 'text' as const, text: 'ANSWER_SURVIVES_CLEANUP_FAILURE' }],
           stopReason: 'completed' as const,
@@ -61,7 +60,7 @@ class DiagnosticProvider implements SubagentProvider {
       throw new Error('snapshot diagnostic provider expected exactly five starts')
     }
     return {
-      id: brandString<SessionId>(fixture.id),
+      id: SessionId(fixture.id),
       result: Promise.resolve({
         output: [...fixture.output],
         diagnostic: fixture.diagnostic,

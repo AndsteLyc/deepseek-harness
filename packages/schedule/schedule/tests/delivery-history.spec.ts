@@ -1,13 +1,12 @@
 /** Saved delivery queries use task storage, never Session history or Agent activation. */
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { MessageId } from '@deepseek-ai/dsh-llm/types'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { ScheduleInputError, createAfterScheduleRecord } from '../src/domain.ts'
+import { ScheduleId, ScheduleInputError, createAfterScheduleRecord } from '../src/domain.ts'
 import { scheduleDomain, type ScheduleTask } from '../src/storage.ts'
 import { appendDelivery } from '../src/delivery-history.ts'
-import type { ScheduleDeliveryRecord, ScheduleId } from '../src/types.ts'
+import type { ScheduleDeliveryRecord } from '../src/types.ts'
 import { agentFor, boundTask, harness, seedTasks, taskTable } from './harness.ts'
 
 const contexts: Context[] = []
@@ -20,13 +19,13 @@ afterEach(async () => {
 async function setup(options: Parameters<typeof harness>[0] = {}) {
   return harness({ ...options, onContext: ctx => contexts.push(ctx) })
 }
-const sessionId = brandString<SessionId>('history-owner')
-const id = brandString<ScheduleId>('history-task')
+const sessionId = SessionId('history-owner')
+const id = ScheduleId('history-task')
 const rule = createAfterScheduleRecord(id, 'Current task prompt', 1, Date.parse('2026-09-16T00:00:00.000Z'), 'Current task prompt')
 const metadata = { earlierRecordsPruned: false, retention: { days: 30, records: 200 } }
 function receipt(index: number): ScheduleDeliveryRecord {
   return {
-    messageId: brandString<MessageId>(`message-${index}`), prompt: `Sent prompt ${index}`, targetSessionId: sessionId,
+    messageId: MessageId(`message-${index}`), prompt: `Sent prompt ${index}`, targetSessionId: sessionId,
     scheduledAt: '2026-09-15T00:00:00.000Z',
     deliveredAt: index % 2 === 0 ? '2026-09-15T00:00:01.000Z' : '2026-09-14T00:00:01.000Z',
   }
@@ -54,7 +53,7 @@ it('paginates more than one full page by identity across appended arrivals and c
   test.ctx.on('schedule/changed', changed)
   const first = await test.service.history({ id, limit: 100 })
   expect(first).toEqual({
-    id, records: records.slice(3).reverse(), ...metadata, earlierRecordsUnavailable: false, nextBefore: brandString<MessageId>('message-3'),
+    id, records: records.slice(3).reverse(), ...metadata, earlierRecordsUnavailable: false, nextBefore: MessageId('message-3'),
   })
   if ('code' in first || first.nextBefore === undefined) throw new Error('Expected delivery page with an older cursor')
   const arrival = receipt(103)
@@ -98,7 +97,7 @@ it('returns explicit missing task, wrong binding, and unknown cursor results', a
   })
   expect(await test.service.history({ id, limit: 1 })).toEqual({ id, code: 'schedule_not_found' })
   expect(await test.service.history({ id, limit: 1 })).toEqual({ id, code: 'schedule_not_found' })
-  expect(await test.service.history({ id: record.id, limit: 1, before: brandString<MessageId>('unknown') })).toEqual({
+  expect(await test.service.history({ id: record.id, limit: 1, before: MessageId('unknown') })).toEqual({
     id: record.id, code: 'delivery_cursor_not_found',
   })
   // A task without a Session-bound rule is outside the Session-bound API even when it targets that Session.
@@ -308,6 +307,6 @@ it('drops records outside the day window and keeps the flag once it is set', () 
   const already = {
     ...task, deliveryHistory: { records: appended.deliveryHistory.records, earlierRecordsUnavailable: true, earlierRecordsPruned: true },
   }
-  expect(appendDelivery(already, { ...fresh, messageId: brandString<MessageId>('message-10') }, { days: 30, records: 200 })
+  expect(appendDelivery(already, { ...fresh, messageId: MessageId('message-10') }, { days: 30, records: 200 })
     .deliveryHistory.earlierRecordsPruned).toBe(true)
 })

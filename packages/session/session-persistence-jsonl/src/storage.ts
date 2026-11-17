@@ -10,7 +10,6 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionHeader, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import {
@@ -20,7 +19,7 @@ import {
   SessionAlreadyOwnedError,
   SessionHandleClosedError,
   SessionPersistenceNotFoundError,
-  type SessionPersistenceRevision,
+  SessionPersistenceRevision,
   SessionReadOnlyError,
 } from '@deepseek-ai/dsh-session-persistence'
 import type {
@@ -417,7 +416,7 @@ export class JsonlBackendTracker {
     this.writers.set(header.id, null)
     this.pending.set(header.id, {
       header,
-      revision: brandString<SessionPersistenceRevision>(`memory:${this.name}:${++this.counter}`),
+      revision: SessionPersistenceRevision(`memory:${this.name}:${++this.counter}`),
       inheritedEventCount,
     })
   }

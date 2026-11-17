@@ -6,15 +6,13 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SubagentService from '@deepseek-ai/dsh-subagent'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import { mountWorkingDirectoryFixture } from '../../../subagent/subagent/tests/working-directory-fixture.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import TeamService from '../src/index.ts'
-import type { TeamId, TeamMessageId, TeamTaskId } from '../src/types.ts'
+import TeamService, { TeamId, TeamMessageId, TeamTaskId } from '../src/index.ts'
 import { teamProjectionDefinition } from '../src/projection.ts'
 import type { TeamMemberSnapshot } from '../src/index.ts'
 import { TestSessionQuery } from './test-session-query.ts'
@@ -96,7 +94,7 @@ for (const backend of backends) {
     it.each([undefined, false, true])('preserves saved mode %s when resumed with the opposite default', async (enabled) => {
       const storageRoot = mkdtempSync(join(tmpdir(), 'dsh-team-default-'))
       roots.push(storageRoot)
-      const id = brandString<SessionId>('configured-resume')
+      const id = SessionId('configured-resume')
       const first = await stack(backend, storageRoot, [], { defaultEnabled: enabled === true })
       const lead = await first.ctx.agentLoop.create(id, { provider: 'mock', model: 'mock' })
       lead.session.append('session/title', { title: 'Saved session', messageSeqs: [], source: { kind: 'user' } })
@@ -117,7 +115,7 @@ for (const backend of backends) {
     it('restores the saved mode and retains tasks while disabled', async () => {
       const storageRoot = mkdtempSync(join(tmpdir(), 'dsh-team-mode-'))
       roots.push(storageRoot)
-      const id = brandString<SessionId>('saved-mode')
+      const id = SessionId('saved-mode')
       const first = await stack(backend, storageRoot, [])
       const lead = await first.ctx.agentLoop.create(id, { provider: 'mock', model: 'mock' })
       expect(first.ctx.agentTeams.isEnabled(lead)).toBe(false)
@@ -141,7 +139,7 @@ for (const backend of backends) {
     }, async () => {
       const storageRoot = mkdtempSync(join(tmpdir(), `dsh-team-restart-${backend.name.toLowerCase()}-`))
       roots.push(storageRoot)
-      const rootId = brandString<SessionId>(`${backend.name.toLowerCase()}-restart-root`)
+      const rootId = SessionId(`${backend.name.toLowerCase()}-restart-root`)
 
       const first = await stack(backend, storageRoot, [textResponse('initial teammate answer')])
       const firstLead = await first.ctx.agentLoop.create(rootId, { provider: 'mock', model: 'mock' })
@@ -153,8 +151,8 @@ for (const backend of backends) {
         delivery: 'caller',
       })
       await vi.waitFor(() => { expect(first.ctx.agents.get(started.childId)).toBeUndefined() }, { timeout: 5_000 })
-      const created = { id: brandString<TeamTaskId>('task-1'), revision: 1, subject: 'carry over', description: 'survives restart', status: 'pending' as const, blockedBy: [], writeScopes: [] }
-      firstLead.session.append('team/task', { version: 2, teamId: brandString<TeamId>(rootId), task: created })
+      const created = { id: TeamTaskId('task-1'), revision: 1, subject: 'carry over', description: 'survives restart', status: 'pending' as const, blockedBy: [], writeScopes: [] }
+      firstLead.session.append('team/task', { version: 2, teamId: TeamId(rootId), task: created })
       await first.ctx.sessions.flush(firstLead.session)
       await first.dispose()
 
@@ -183,8 +181,8 @@ for (const backend of backends) {
     }, async () => {
       const storageRoot = mkdtempSync(join(tmpdir(), `dsh-team-mail-${backend.name.toLowerCase()}-`))
       roots.push(storageRoot)
-      const rootId = brandString<SessionId>(`${backend.name.toLowerCase()}-mail-root`)
-      const childId = brandString<SessionId>('historical-worker')
+      const rootId = SessionId(`${backend.name.toLowerCase()}-mail-root`)
+      const childId = SessionId('historical-worker')
 
       const first = await stack(backend, storageRoot, [])
       const firstLead = await first.ctx.agentLoop.create(rootId, { provider: 'mock', model: 'mock' })
@@ -197,12 +195,12 @@ for (const backend of backends) {
         phase: 'provisioning',
       }
       const message = {
-        id: brandString<TeamMessageId>('legacy-pending'), senderId: rootId, senderName: 'lead', targetId: childId,
+        id: TeamMessageId('legacy-pending'), senderId: rootId, senderName: 'lead', targetId: childId,
         content: [{ type: 'text' as const, text: 'historical pending context' }],
       }
-      firstLead.session.append('team/member', { version: 2, teamId: brandString<TeamId>(rootId), member: { ...historical, phase: 'active' } })
-      firstLead.session.append('team/message/delivered', { version: 2, teamId: brandString<TeamId>(rootId), messageId: message.id, targetId: childId })
-      firstLead.session.append('team/message/queued', { version: 2, teamId: brandString<TeamId>(rootId), message })
+      firstLead.session.append('team/member', { version: 2, teamId: TeamId(rootId), member: { ...historical, phase: 'active' } })
+      firstLead.session.append('team/message/delivered', { version: 2, teamId: TeamId(rootId), messageId: message.id, targetId: childId })
+      firstLead.session.append('team/message/queued', { version: 2, teamId: TeamId(rootId), message })
       await first.ctx.agentTeams.setEnabled(firstLead, true)
       const task = await first.ctx.agentTeams.createTask(firstLead, { subject: 'saved board', description: 'survives retired records' })
       await first.ctx.sessions.flush(firstLead.session)

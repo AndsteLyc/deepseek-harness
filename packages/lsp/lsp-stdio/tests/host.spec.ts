@@ -10,7 +10,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { FsError } from '@deepseek-ai/dsh-fs'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { deadline } from '@deepseek-ai/dsh-timeout'
-import { canonicalizeWorkspace, readHostSource } from '../src/host.ts'
+import { canonicalizeWorkspace, readHostSource } from '@deepseek-ai/dsh-lsp-stdio'
 
 const execFileAsync = promisify(execFile)
 

@@ -34,7 +34,7 @@ import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { ArchivedFilter, GroupNode, SessionNode, SessionOrderBy, SessionRowState } from '../tree.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, sessionSearchIndex, owningGroupKey, owningParentFolder,
+  deriveFlat, deriveGroups, deriveSearchResults, orderByRecency, owningGroupKey, owningParentFolder,
   pinCurrentBlank, reconcileManualOrder, sessionMemberIds, UNGROUPED_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
@@ -823,18 +823,6 @@ function SearchResults({
   const currentRemote = remote.query === query
     ? remote
     : { query, status: 'loading' as const, items: [], hasMore: false }
-  // The Session list republishes while replies run; each republish updates the
-  // previous index so unchanged titles, labels, and ids keep their preparation.
-  const [built, setBuilt] = useState(() => ({
-    list, workspaces, archivedSessionIds, archivedFilter,
-    index: sessionSearchIndex(list, workspaces, archivedSessionIds, archivedFilter),
-  }))
-  let index = built.index
-  if (built.list !== list || built.workspaces !== workspaces
-    || built.archivedSessionIds !== archivedSessionIds || built.archivedFilter !== archivedFilter) {
-    index = sessionSearchIndex(list, workspaces, archivedSessionIds, archivedFilter, built.index)
-    setBuilt({ list, workspaces, archivedSessionIds, archivedFilter, index })
-  }
   const results = useMemo(
     () => deriveSearchResults(
       list,
@@ -845,9 +833,8 @@ function SearchResults({
       statuses,
       currentRemote,
       resultLimit,
-      index,
     ),
-    [list, workspaces, query, archivedSessionIds, archivedFilter, statuses, currentRemote, resultLimit, index],
+    [list, workspaces, query, archivedSessionIds, archivedFilter, statuses, currentRemote, resultLimit],
   )
   const pending = currentRemote.status === 'loading'
   const currentId = panelActive

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { CommandId } from '@deepseek-ai/dsh-commands/types'
+import { CommandId } from '@deepseek-ai/dsh-commands/brand'
 import type { ChatNode } from '../src/client/contract/chat-nodes.ts'
 import { isVisibleChatNode } from '../src/client/contract/chat-visibility.ts'
 
@@ -12,7 +11,7 @@ const placement = {
 function command(args: string | null, outcome: ChatNode<'command'>['data']['outcome'], name: string | null = 'team'): ChatNode<'command'> {
   return {
     ...placement, kind: 'command',
-    data: { kind: 'command', seq: 1, time: 0, commandId: brandString<CommandId>('test'), name, args, outcome },
+    data: { kind: 'command', seq: 1, time: 0, commandId: CommandId('test'), name, args, outcome },
   }
 }
 

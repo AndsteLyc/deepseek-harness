@@ -21,9 +21,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import SessionStore from '@deepseek-ai/dsh-session'
 import ScheduleService from '../src/index.ts'
-import { createAfterScheduleRecord, createEveryScheduleRecord } from '../src/domain.ts'
-import type { ScheduleId } from '../src/types.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { createAfterScheduleRecord, createEveryScheduleRecord, ScheduleId } from '../src/domain.ts'
 
 interface Args {
   ended: number
@@ -52,7 +50,7 @@ function seedText(ended: number, active: number): string {
     const id = `ended-${index}`
     tasks[id] = {
       sessionId: `ended-session-${index}`,
-      record: createAfterScheduleRecord(brandString<ScheduleId>(id), `Ended ${index}`, 60, now - 5 * 60_000, `Ended ${index}`),
+      record: createAfterScheduleRecord(ScheduleId(id), `Ended ${index}`, 60, now - 5 * 60_000, `Ended ${index}`),
       status: 'inactive',
     }
   }
@@ -60,7 +58,7 @@ function seedText(ended: number, active: number): string {
     const id = `active-${index}`
     tasks[id] = {
       sessionId: `active-session-${index}`,
-      record: createEveryScheduleRecord(brandString<ScheduleId>(id), `Active ${index}`, 3_600, now, `Active ${index}`),
+      record: createEveryScheduleRecord(ScheduleId(id), `Active ${index}`, 3_600, now, `Active ${index}`),
       status: 'active',
     }
   }
@@ -151,7 +149,7 @@ async function measure(args: Args) {
         const table = facility.get('schedule')?.table('tasks')
         if (table === undefined) throw new Error('schedule domain is not open')
         for (let index = 0; index < args.ended; index += 1) {
-          await table.delete(brandString<ScheduleId>(`ended-${index}`))
+          await table.delete(ScheduleId(`ended-${index}`))
         }
         return { deleted: args.ended }
       })()

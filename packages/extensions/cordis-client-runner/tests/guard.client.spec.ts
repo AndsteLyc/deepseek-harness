@@ -8,7 +8,6 @@
  * CALLING fiber, so disposing it must remove them (HMR safety).
  */
 import { Context } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import { describe, expect, it, vi } from 'vitest'
 import type { FC } from 'react'
 import type {
@@ -26,9 +25,9 @@ const C: FC<object> = () => null
 /** The exact running package carried by a Client dispatch. */
 function pkg(): DynamicCordisPackage {
   return {
-    pluginId: brandString<CordisDynamicPluginId>('dyn-1'),
-    packageId: brandString<CordisDynamicPackageId>('pkg-1'),
-    pluginRunId: brandString<CordisDynamicPluginRunId>('run-1'),
+    pluginId: 'dyn-1' as CordisDynamicPluginId,
+    packageId: 'pkg-1' as CordisDynamicPackageId,
+    pluginRunId: 'run-1' as CordisDynamicPluginRunId,
     name: 'demo',
   }
 }

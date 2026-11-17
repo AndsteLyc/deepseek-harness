@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { transportError } from '../src/rpc.ts'
+import { RpcId, transportError } from '../src/rpc.ts'
 import {
   clientRequestSchema,
   rpcErrorSchema,
@@ -11,8 +11,8 @@ import {
 import { z } from 'zod'
 
 describe('Connection RPC schema', () => {
-  it('preserves string correlation ids and rejects non-strings', () => {
-    expect(rpcIdSchema.parse('abc')).toBe('abc')
+  it('brands any validated string correlation id', () => {
+    expect(RpcId('abc')).toBe('abc')
     expect(rpcIdSchema.parse('')).toBe('')
     expect(() => rpcIdSchema.parse(42)).toThrow()
   })

@@ -4,16 +4,14 @@ import { Context, FiberState } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
 import type { Agent, InboxTarget } from '@deepseek-ai/dsh-agent'
-import AttachmentStore from '@deepseek-ai/dsh-attachment'
-import type { AttachmentId } from '@deepseek-ai/dsh-attachment/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type {
   FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, SaveFileAttachment, SaveFileStreamAttachment,
   SaveImageAttachment,
 } from '@deepseek-ai/dsh-attachment'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { MessageSource, UserMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { Session, type SessionId, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionId, SessionLogOffset, type SessionEvent } from '@deepseek-ai/dsh-session'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import FileUploads from '@deepseek-ai/dsh-client-file-upload'
@@ -23,7 +21,7 @@ import { ApiSessionAgentController } from '../src/agent.ts'
 import { SessionCommandController } from '../src/commands.ts'
 import type { SessionRequestId } from '../src/types.ts'
 
-const SESSION = brandString<SessionId>('upload-session')
+const SESSION = SessionId('upload-session')
 const IMAGE_LIMITS: ImageAttachmentLimits = {
   maxImageBytes: 4,
   maxImagesPerMessage: 2,
@@ -33,7 +31,7 @@ const IMAGE_LIMITS: ImageAttachmentLimits = {
   mediaTypes: ['image/png'],
 }
 const STAGED_IMAGE: ImageAttachmentRef = {
-  attachmentId: brandString<AttachmentId>(`sha256:${'12'.repeat(32)}`),
+  attachmentId: AttachmentId(`sha256:${'12'.repeat(32)}`),
   mediaType: 'image/png',
   bytes: 3,
   width: 1,
@@ -100,7 +98,7 @@ async function uploadHarness(
   agent.ctx = createScope(ctx, agent).ctx
   const disposeAgent = await ctx.agents.register(agent)
   const saveFile = vi.fn((input: SaveFileAttachment): Promise<FileAttachmentRef> => Promise.resolve({
-    attachmentId: brandString<AttachmentId>(`sha256:${'cd'.repeat(32)}`),
+    attachmentId: AttachmentId(`sha256:${'cd'.repeat(32)}`),
     name: input.name ?? 'file',
     bytes: input.data.byteLength,
   }))
@@ -108,7 +106,7 @@ async function uploadHarness(
     let bytes = 0
     for await (const chunk of input.data) bytes += chunk.byteLength
     return {
-      attachmentId: brandString<AttachmentId>(`sha256:${'ef'.repeat(32)}`),
+      attachmentId: AttachmentId(`sha256:${'ef'.repeat(32)}`),
       name: input.name ?? 'file',
       bytes,
     }
@@ -200,7 +198,7 @@ describe('Session file uploads', () => {
       attachments: [{ type: 'file', attachment: receipt.file }],
     })
     const image: ImageAttachmentRef = {
-      attachmentId: brandString<AttachmentId>(`sha256:${'ab'.repeat(32)}`),
+      attachmentId: AttachmentId(`sha256:${'ab'.repeat(32)}`),
       mediaType: 'image/png',
       bytes: 3,
       width: 1,
@@ -387,7 +385,7 @@ describe('Session file uploads', () => {
     expect(agent.model.current()).toBeUndefined()
     const resolveModel = vi.spyOn(ctx.llm, 'resolveModelInfo')
     const image: ImageAttachmentRef = {
-      attachmentId: brandString<AttachmentId>(`sha256:${'ab'.repeat(32)}`),
+      attachmentId: AttachmentId(`sha256:${'ab'.repeat(32)}`),
       mediaType: 'image/png', bytes: 3, width: 1, height: 1,
     }
     saveImages.mockResolvedValueOnce([image])
@@ -410,7 +408,7 @@ describe('Session file uploads', () => {
     await vi.waitFor(() => { expect(saveFile).toHaveBeenCalledOnce() })
     await disposeAgent()
     saved.resolve({
-      attachmentId: brandString<AttachmentId>(`sha256:${'ab'.repeat(32)}`), name: 'late.bin', bytes: 3,
+      attachmentId: AttachmentId(`sha256:${'ab'.repeat(32)}`), name: 'late.bin', bytes: 3,
     })
     await expect(uploading).rejects.toMatchObject({ code: 'session/not-found' })
   })
@@ -561,7 +559,7 @@ describe('Session file uploads', () => {
   })
 
   it('does not reuse inherited acceptance when a copied message is reinserted in the child', async () => {
-    const ancestor = Session.create(brandString<SessionId>('ancestor'))
+    const ancestor = Session.create(SessionId('ancestor'))
     const message = createUserMessage({ content: [{ type: 'text', text: 'parent input' }], source: USER_SOURCE })
     ancestor.append('agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [message] })
     ancestor.append('agent/inbox/spliced', { target: 'next-turn', start: 0, removedCount: 1, inserted: [] })
@@ -674,7 +672,7 @@ describe('Session file uploads', () => {
     await vi.waitFor(() => { expect(saveImages).toHaveBeenCalledOnce() })
     await disposeAgent()
     admitted.resolve([{
-      attachmentId: brandString<AttachmentId>('admitted-image'), mediaType: 'image/png', bytes: 3, width: 1, height: 1,
+      attachmentId: AttachmentId('admitted-image'), mediaType: 'image/png', bytes: 3, width: 1, height: 1,
     }])
     await expect(prompting).rejects.toMatchObject({ code: 'session/not-found' })
   })
@@ -695,7 +693,7 @@ describe('Session file uploads', () => {
     await vi.waitFor(() => { expect(saveImages).toHaveBeenCalledOnce() })
     uploads.retirePrompt(agent, 'req-1')
     admitted.resolve([{
-      attachmentId: brandString<AttachmentId>('admitted-image'), mediaType: 'image/png', bytes: 3, width: 1, height: 1,
+      attachmentId: AttachmentId('admitted-image'), mediaType: 'image/png', bytes: 3, width: 1, height: 1,
     }])
     await expect(prompting).rejects.toMatchObject({
       code: 'session/attachment-invalid', details: { reason: 'FILE_NOT_STAGED' },

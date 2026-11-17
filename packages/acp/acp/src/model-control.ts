@@ -2,8 +2,7 @@
 
 import type { SessionConfigOption, SessionConfigValueId } from '@agentclientprotocol/sdk'
 import { type Model, type ModelSelection } from '@deepseek-ai/dsh-agent'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ReasoningEffortId, LlmCallConfig, LlmRuntime } from '@deepseek-ai/dsh-llm'
+import { ReasoningEffortId, type LlmCallConfig, type LlmRuntime } from '@deepseek-ai/dsh-llm'
 
 const MODEL_CONFIG_ID = 'model'
 const REASONING_CONFIG_ID = 'reasoning_effort'
@@ -82,7 +81,7 @@ export class AcpModelControl {
         this.model.select(await this.resolveSelection({
           provider: current.provider,
           model: current.model,
-          ...providerDefault ? {} : { reasoningEffort: brandString<ReasoningEffortId>(value) },
+          ...providerDefault ? {} : { reasoningEffort: ReasoningEffortId(value) },
         }, signal))
       } else {
         throw new AcpModelConfigError(`unknown session config option: ${configId}`)

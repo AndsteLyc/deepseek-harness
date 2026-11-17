@@ -1,6 +1,5 @@
 /** Isolated verification for a staged or competing current JSONL generation. */
 
-import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
 import type { WorkerOptions } from 'node:worker_threads'
 import type { JsonlCompression } from './format.ts'
@@ -72,11 +71,10 @@ class VerificationScheduler {
 const verificationScheduler = new VerificationScheduler()
 
 function workerSpawn(request: VerificationRequest): { readonly entry: string | URL; readonly options: WorkerOptions } {
-  // The single-file runtime resolves string Worker entries through its embedded filesystem.
   /* v8 ignore next 3 -- built-worker coverage owns the bundled path. */
   if (!import.meta.url.endsWith('.ts')) {
     return {
-      entry: fileURLToPath(new URL('./worker.cjs', import.meta.url)),
+      entry: new URL('./worker.cjs', import.meta.url),
       options: { workerData: request, execArgv: [] },
     }
   }

@@ -1,7 +1,4 @@
-/**
- * Test-only request routing to a second model after tool execution. The
- * `model-switch-compaction` and `model-switch-overflow-recovery` scenarios both load it.
- */
+/** Test-only request routing from a large model to a smaller model after tool execution. */
 export const name = 'model-switch-compaction-driver'
 export const inject = ['tools']
 

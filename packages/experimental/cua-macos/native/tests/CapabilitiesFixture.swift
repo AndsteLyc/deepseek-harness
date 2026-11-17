@@ -89,14 +89,7 @@ final class CapabilitiesFixture: NSObject, NSApplicationDelegate, NSWindowDelega
                 value["keyCode"] = event.keyCode
                 value["characters"] = event.characters ?? ""
                 value["repeat"] = event.isARepeat
-            } else {
-                value["button"] = event.buttonNumber
-                value["pressedButtons"] = NSEvent.pressedMouseButtons
-                value["deltaX"] = event.deltaX
-                value["deltaY"] = event.deltaY
-                value["eventNumber"] = event.eventNumber
-                value["point"] = [event.locationInWindow.x, event.locationInWindow.y]
-            }
+            } else { value["button"] = event.buttonNumber }
             self.events.append(value)
             self.persist()
         }
@@ -133,7 +126,7 @@ final class CapabilitiesFixture: NSObject, NSApplicationDelegate, NSWindowDelega
         }
         let frame = pad.convert(pad.bounds, to: nil)
         let selection = text.selectedRange()
-        let result: [String: Any] = ["pid": ProcessInfo.processInfo.processIdentifier, "windowId": window.windowNumber > 0 ? String(window.windowNumber) as Any : NSNull(),
+        let result: [String: Any] = ["pid": ProcessInfo.processInfo.processIdentifier, "windowId": window.windowNumber,
             "active": NSApplication.shared.isActive, "keyWindow": window.isKeyWindow,
             "textFocused": window.firstResponder === text, "pasteAttempts": pasteAttempts,
             "text": text.string, "selection": [selection.location, selection.length], "runs": runs, "events": events, "axPresses": axPresses, "axMenus": axMenus,

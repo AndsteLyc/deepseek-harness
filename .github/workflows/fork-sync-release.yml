@@ -1,0 +1,115 @@
+name: Fork · Sync official release
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: fork-sync-release
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Prepare and validate official release
+    if: github.ref == 'refs/heads/custom'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      changed: ${{ steps.prepare.outputs.changed }}
+      tag: ${{ steps.prepare.outputs.tag }}
+      commit: ${{ steps.publish.outputs.commit }}
+    steps:
+      - name: Check out custom
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: custom
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v5.0.0
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install current dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release synchronization regressions
+        run: node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs
+
+      - name: Prepare latest official tag
+        id: prepare
+        run: node .github/scripts/sync-release.mjs
+
+      - name: Install new release dependencies
+        if: steps.prepare.outputs.changed == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and check new release
+        if: steps.prepare.outputs.changed == 'true'
+        env:
+          DSH_TELEMETRY_DISABLED: '1'
+        run: pnpm run build
+
+      - name: Check preserved time and connection APIs
+        if: steps.prepare.outputs.changed == 'true'
+        run: |
+          for path in \
+            packages/context/time-context/tests/time-context.spec.ts \
+            packages/client/connection/tests/browser-auth.host.spec.ts \
+            packages/client/connection/tests/node-half.host.spec.ts \
+            packages/client/web/tests/base-styles.client.spec.ts; do
+            test -f "$path"
+          done
+          pnpm exec vitest run \
+            packages/context/time-context/tests/time-context.spec.ts \
+            packages/client/connection/tests/browser-auth.host.spec.ts \
+            packages/client/connection/tests/node-half.host.spec.ts \
+            packages/client/web/tests/base-styles.client.spec.ts
+
+      - name: Check standard preset through the real Loader
+        if: steps.prepare.outputs.changed == 'true'
+        env:
+          DSH_TELEMETRY_DISABLED: '1'
+        run: |
+          test -f packages/context/time-context/tests/time-context.e2e.ts
+          test -f packages/context/time-context/tests/standard-preset.e2e.ts
+          pnpm exec vitest run --config vitest.e2e.config.ts \
+            packages/context/time-context/tests/time-context.e2e.ts \
+            packages/context/time-context/tests/standard-preset.e2e.ts
+
+      - name: Verify prepared release baseline
+        if: steps.prepare.outputs.changed == 'true'
+        run: node .github/scripts/verify-release-base.mjs
+
+      - name: Commit and push verified release
+        id: publish
+        if: steps.prepare.outputs.changed == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.prepare.outputs.tag }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u
+          git -c core.hooksPath=/dev/null commit -m "chore(fork): 同步官方 ${RELEASE_TAG}"
+          git -c core.hooksPath=/dev/null push origin HEAD:custom
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  package:
+    name: Package verified official release
+    needs: sync
+    if: needs.sync.outputs.changed == 'true'
+    permissions:
+      contents: write
+      actions: write
+    uses: ./.github/workflows/fork-package-release.yml
+    with:
+      ref: ${{ needs.sync.outputs.commit }}

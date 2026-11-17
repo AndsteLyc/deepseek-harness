@@ -3,7 +3,8 @@
 import { existsSync, mkdtempSync, realpathSync } from 'node:fs'
 import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { Ajv2020 } from 'ajv/dist/2020.js'
-import { parseEntryYaml } from '@deepseek-ai/cordis-plugin-include'
+import * as yaml from 'js-yaml'
+import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import type { ConfigSchemaDump } from '@deepseek-ai/dsh-app-boot'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -161,7 +162,7 @@ describe.skipIf(!builtArtifactsExist)('dsh --dump-config-schema assembled output
     const composed = await dump(fixture, [], '--dump-config')
     const validator = new Ajv2020({ strict: false, validateFormats: false })
     const validate = validator.compile(document)
-    expect(validate(parseEntryYaml(composed.stdout)), JSON.stringify(validate.errors)).toBe(true)
+    expect(validate(yaml.load(composed.stdout, { schema: entryListSchema })), JSON.stringify(validate.errors)).toBe(true)
     expect(validate([{ name: `${packageName}/namespace`, config: { attempts: 'wrong' } }])).toBe(false)
     const patch = validator.compile({ $schema: document.$schema, $defs: document.$defs, $ref: '#/$defs/patchList' })
     expect(patch([{ id: 'schema-class', config: { enabled: 'wrong' } }])).toBe(false)

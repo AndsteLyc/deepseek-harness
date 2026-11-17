@@ -4,7 +4,6 @@
  */
 
 import type { Fiber } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   ApprovalRequestId, CordisDynamicPackageId, CordisDynamicPluginId, CordisDynamicPluginRunId,
@@ -154,7 +153,7 @@ export class DynamicCordisRegistry {
    */
   mintPluginId(prefix: string): string {
     let id: CordisDynamicPluginId
-    do id = brandString<CordisDynamicPluginId>(`${prefix}-${this.nextPlugin++}`)
+    do id = `${prefix}-${this.nextPlugin++}` as CordisDynamicPluginId
     while (this.plugins.has(id))
     return id
   }

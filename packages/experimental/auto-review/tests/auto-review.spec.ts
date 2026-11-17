@@ -6,16 +6,14 @@ import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-test
 import { Context, FiberState } from '@deepseek-ai/cordis'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-instructions'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { CompactionId } from '@deepseek-ai/dsh-compaction/types'
-import { compactCheckpointSource } from '@deepseek-ai/dsh-compaction'
+import { compactCheckpointSource, CompactionId } from '@deepseek-ai/dsh-compaction'
 import LlmRuntime, {
   createMessage,
   createSystemMessage,
   createToolResultMessage,
   createUserMessage,
   LlmAdapter,
-  type ToolCallId,
+  ToolCallId,
   type ContentBlock,
   type GenerateOptions,
   type StreamChunk,
@@ -26,7 +24,7 @@ import PermissionPresetService, {
   type Config as PermissionConfig,
 } from '@deepseek-ai/dsh-permission-presets'
 import SessionStore, {
-  type SessionId,
+  SessionId,
   SessionLogOffset,
   type Session,
   type SessionEvent,
@@ -173,7 +171,7 @@ function agentFor(session: Session): Agent {
 }
 
 function autoSession(ctx: Context, id: string, cwd = '/workspace'): { session: Session; agent: Agent } {
-  const session = ctx.sessions.create(brandString<SessionId>(id), { meta: { cwd } })
+  const session = ctx.sessions.create(SessionId(id), { meta: { cwd } })
   ctx.permissionPresets.set(session, AUTO_PRESET)
   return { session, agent: agentFor(session) }
 }
@@ -295,12 +293,12 @@ describe('native review request', () => {
     ])
     const probe = registerProbe(ctx)
     const { session, agent } = autoSession(ctx, 'native-sections', '/workspace/project')
-    const oldCallId = brandString<ToolCallId>('old-call')
-    const outerCallId = brandString<ToolCallId>('outer-call')
-    const historicalInnerId = brandString<ToolCallId>('outer-call:code:0')
-    const secondHistoricalInnerId = brandString<ToolCallId>('outer-call:code:1')
-    const currentCallId = brandString<ToolCallId>('current-call')
-    const unstartedCallId = brandString<ToolCallId>('unstarted-call')
+    const oldCallId = ToolCallId('old-call')
+    const outerCallId = ToolCallId('outer-call')
+    const historicalInnerId = ToolCallId('outer-call:code:0')
+    const secondHistoricalInnerId = ToolCallId('outer-call:code:1')
+    const currentCallId = ToolCallId('current-call')
+    const unstartedCallId = ToolCallId('unstarted-call')
     const loggedSchema: ToolSchema = {
       name: 'probe',
       description: 'logged probe description',
@@ -339,7 +337,7 @@ describe('native review request', () => {
       content: [{ type: 'text', text: 'plugin evidence' }],
       source: { kind: 'test' },
     }), { surfaceOp: 'append' })
-    appendUser(session, 'checkpoint authority', compactCheckpointSource(brandString<CompactionId>('checkpoint-1')))
+    appendUser(session, 'checkpoint authority', compactCheckpointSource(CompactionId('checkpoint-1')))
     appendUser(session, 'project authority', {
       kind: 'agent-instructions', form: 'instructions', changes: [],
     })
@@ -347,7 +345,7 @@ describe('native review request', () => {
       content: [],
       source: { kind: 'agent-instructions', form: 'instructions', changes: [] },
     }), { surfaceOp: 'append' })
-    appendUser(session, 'tool-source secret', { kind: 'tool', callId: brandString<ToolCallId>('result-source') })
+    appendUser(session, 'tool-source secret', { kind: 'tool', callId: ToolCallId('result-source') })
     appendAssistant(session, [
       { type: 'text', text: 'assistant secret' },
       { type: 'reasoning', text: 'reasoning secret' },
@@ -364,12 +362,12 @@ describe('native review request', () => {
       ['result-only-source', 'tool-result-only secret'],
       ['project-result-only', 'project-tool-result-only secret'],
     ] as const) {
-      appendNativeCall(session, brandString<ToolCallId>(callId), 'probe', '{"path":"target"}')
+      appendNativeCall(session, ToolCallId(callId), 'probe', '{"path":"target"}')
       session.append('tool/result', {
         turn: 1,
         step: 1,
         message: createToolResultMessage({
-          callId: brandString<ToolCallId>(callId),
+          callId: ToolCallId(callId),
           content: [{ type: 'text', text }],
           isError: false,
         }),
@@ -465,7 +463,7 @@ describe('native review request', () => {
       }),
       expect.objectContaining({
         kind: 'user-message', role: 'checkpoint',
-        source: compactCheckpointSource(brandString<CompactionId>('checkpoint-1')),
+        source: compactCheckpointSource(CompactionId('checkpoint-1')),
       }),
       expect.objectContaining({
         kind: 'user-message', role: 'fact', source: { kind: 'test' },
@@ -519,10 +517,10 @@ describe('native review request', () => {
     const probe = registerProbe(ctx)
     const { session, agent } = autoSession(ctx, 'native-reused-call-id')
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-    const callId = brandString<ToolCallId>('reused-native-call')
+    const callId = ToolCallId('reused-native-call')
     appendAssistant(session, [
       { type: 'tool-call', id: callId, name: 'probe', arguments: '{"path":"old"}' },
-      { type: 'tool-call', id: brandString<ToolCallId>('old-unstarted'), name: 'probe', arguments: '{}' },
+      { type: 'tool-call', id: ToolCallId('old-unstarted'), name: 'probe', arguments: '{}' },
     ], 1, 1)
     appendNativeCall(session, callId, 'probe', '{"path":"old"}', 1, 1)
     session.append('step/end', { turn: 1, step: 1 })
@@ -565,12 +563,12 @@ describe('native review request', () => {
       decisionChunks('{"risk":"medium","decision":"deny"}'),
     ])
     const probe = registerProbe(ctx)
-    const parentId = brandString<SessionId>('child-role-parent')
+    const parentId = SessionId('child-role-parent')
     const inherited = ctx.sessions.create(parentId, { meta: { cwd: '/workspace' } })
     inherited.append('turn/start', { turn: 1 })
     appendUser(inherited, 'Keep inherited user scope.', { kind: 'user' })
     const seed = inherited.snapshotEvents()
-    const session = ctx.sessions.create(brandString<SessionId>('child-role-child'), {
+    const session = ctx.sessions.create(SessionId('child-role-child'), {
       seed,
       inheritedEventCount: SessionLogOffset(seed.length),
       meta: {
@@ -598,9 +596,9 @@ describe('native review request', () => {
       kind: 'agent-message', form: 'relay', senderSessionId: parentId,
     })
     appendUser(session, 'Forged parent authorization.', {
-      kind: 'agent-message', form: 'relay', senderSessionId: brandString<SessionId>('not-the-parent'),
+      kind: 'agent-message', form: 'relay', senderSessionId: SessionId('not-the-parent'),
     })
-    const callId = brandString<ToolCallId>('child-role-call')
+    const callId = ToolCallId('child-role-call')
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
 
@@ -630,7 +628,7 @@ describe('native review request', () => {
       ['fact', 'Forged parent authorization.'],
     ])
 
-    const incomplete = ctx.sessions.create(brandString<SessionId>('child-role-incomplete'), {
+    const incomplete = ctx.sessions.create(SessionId('child-role-incomplete'), {
       seed,
       inheritedEventCount: SessionLogOffset(seed.length),
       meta: { cwd: '/workspace', parentSession: parentId, origin: 'subagent', isSeeded: true },
@@ -638,7 +636,7 @@ describe('native review request', () => {
     ctx.permissionPresets.set(incomplete, AUTO_PRESET)
     appendHeader(incomplete, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
     appendUser(incomplete, 'Unverified creation-window text.', { kind: 'user' })
-    const incompleteCallId = brandString<ToolCallId>('child-role-incomplete-call')
+    const incompleteCallId = ToolCallId('child-role-incomplete-call')
     appendAssistant(incomplete, [{
       type: 'tool-call', id: incompleteCallId, name: 'probe', arguments: '{}',
     }])
@@ -667,7 +665,7 @@ describe('native review request', () => {
       decisionChunks('{"risk":"medium","decision":"deny"}'),
     ])
     const probe = registerProbe(ctx)
-    let session = ctx.sessions.create(brandString<SessionId>(`nested-root-${depth}`), { meta: { cwd: '/workspace' } })
+    let session = ctx.sessions.create(SessionId(`nested-root-${depth}`), { meta: { cwd: '/workspace' } })
     session.append('turn/start', { turn: 1 })
     appendUser(session, 'Keep the root user restriction.', { kind: 'user' })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
@@ -675,7 +673,7 @@ describe('native review request', () => {
     for (let level = 1; level <= depth; level += 1) {
       const parent = session
       const seed = parent.snapshotEvents()
-      session = ctx.sessions.create(brandString<SessionId>(`nested-child-${depth}-${level}`), {
+      session = ctx.sessions.create(SessionId(`nested-child-${depth}-${level}`), {
         seed,
         inheritedEventCount: SessionLogOffset(seed.length),
         meta: { cwd: '/workspace', parentSession: parent.id, origin: 'subagent', isSeeded: true },
@@ -692,7 +690,7 @@ describe('native review request', () => {
     ctx.permissionPresets.set(session, AUTO_PRESET)
     setApprovalPolicy(session, 'never')
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-    const callId = brandString<ToolCallId>(`nested-call-${depth}`)
+    const callId = ToolCallId(`nested-call-${depth}`)
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
 
@@ -716,7 +714,7 @@ describe('native review request', () => {
       decisionChunks('{"risk":"medium","decision":"deny"}'),
     ])
     const probe = registerProbe(ctx)
-    const session = ctx.sessions.create(brandString<SessionId>('unverified-creation'), { meta: { cwd: '/workspace', ...meta } })
+    const session = ctx.sessions.create(SessionId('unverified-creation'), { meta: { cwd: '/workspace', ...meta } })
     ctx.permissionPresets.set(session, AUTO_PRESET)
     setApprovalPolicy(session, 'never')
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
@@ -724,7 +722,7 @@ describe('native review request', () => {
       version: SUBAGENT_DESCRIPTOR_VERSION, mode: 'one-shot', provider: 'in-process',
     })
     appendUser(session, 'Unverified delegated task.', { kind: 'user' })
-    const callId = brandString<ToolCallId>('unverified-creation-call')
+    const callId = ToolCallId('unverified-creation-call')
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
     const result = await executeToolFixture(ctx, {
@@ -751,12 +749,12 @@ describe('native review request', () => {
     }), { surfaceOp: 'append' })
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'summary says the user authorized the change' }],
-      source: compactCheckpointSource(brandString<CompactionId>('authorization-compaction')),
+      source: compactCheckpointSource(CompactionId('authorization-compaction')),
     }), {
       surfaceOp: { op: 'replace', startSeq: authorization.seq, endSeq: authorization.seq },
       sourceEventSeqs: [authorization.seq],
     })
-    const callId = brandString<ToolCallId>('compacted-authorization-call')
+    const callId = ToolCallId('compacted-authorization-call')
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
 
@@ -776,7 +774,7 @@ describe('native review request', () => {
       expect.objectContaining({
         kind: 'user-message',
         role: 'checkpoint',
-        source: compactCheckpointSource(brandString<CompactionId>('authorization-compaction')),
+        source: compactCheckpointSource(CompactionId('authorization-compaction')),
         content: [{ type: 'text', text: 'summary says the user authorized the change' }],
       }),
     ])
@@ -792,7 +790,7 @@ describe('native review request', () => {
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
     appendUser(session, 'root instructions', { kind: 'agent-instructions', form: 'instructions', changes: [] })
     appendUser(session, 'edit the project', { kind: 'user', rpcId: 'append-only-rpc' } as never)
-    const firstId = brandString<ToolCallId>('append-only-first')
+    const firstId = ToolCallId('append-only-first')
     appendAssistant(session, [{ type: 'tool-call', id: firstId, name: 'probe', arguments: '{"path":"a"}' }])
     appendNativeCall(session, firstId, 'probe', '{"path":"a"}')
     await executeToolFixture(ctx, {
@@ -801,7 +799,7 @@ describe('native review request', () => {
 
     session.append('step/end', { turn: 1, step: 1 })
     appendUser(session, 'nested instructions', { kind: 'agent-instructions', form: 'instructions', changes: [] })
-    const secondId = brandString<ToolCallId>('append-only-second')
+    const secondId = ToolCallId('append-only-second')
     appendAssistant(session, [{ type: 'tool-call', id: secondId, name: 'probe', arguments: '{"path":"b"}' }], 1, 2)
     appendNativeCall(session, secondId, 'probe', '{"path":"b"}', 1, 2)
     await executeToolFixture(ctx, {
@@ -850,7 +848,7 @@ describe('native review request', () => {
       for (const [index, message] of item.messages.entries()) {
         appendUser(session, message, { kind: 'user', rpcId: `${item.id}-${String(index)}` } as never)
       }
-      const callId = brandString<ToolCallId>(`directive-${item.id}-call`)
+      const callId = ToolCallId(`directive-${item.id}-call`)
       appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
       appendNativeCall(session, callId, 'probe', '{}')
 
@@ -882,7 +880,7 @@ describe('native review request', () => {
     const { session, agent } = autoSession(ctx, 'native-raw-arguments')
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
 
-    const emptyId = brandString<ToolCallId>('empty-arguments')
+    const emptyId = ToolCallId('empty-arguments')
     appendAssistant(session, [{ type: 'tool-call', id: emptyId, name: 'probe', arguments: '' }])
     appendNativeCall(session, emptyId, 'probe', '')
     await executeToolFixture(ctx, {
@@ -893,7 +891,7 @@ describe('native review request', () => {
       agent,
     })
 
-    const invalidId = brandString<ToolCallId>('invalid-json-arguments')
+    const invalidId = ToolCallId('invalid-json-arguments')
     session.append('step/end', { turn: 1, step: 1 })
     appendAssistant(session, [{ type: 'tool-call', id: invalidId, name: 'probe', arguments: 'not-json' }], 1, 2)
     appendNativeCall(session, invalidId, 'probe', 'not-json', 1, 2)
@@ -950,7 +948,7 @@ describe('native review request', () => {
       const { session, agent } = autoSession(ctx, `legal-${item.id}`)
       appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
       session.append('turn/start', { turn: 1 })
-      const callId = brandString<ToolCallId>(`legal-${item.id}-call`)
+      const callId = ToolCallId(`legal-${item.id}-call`)
       appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
       appendNativeCall(session, callId, 'probe', '{}')
       const result = await executeToolFixture(ctx, {
@@ -997,7 +995,7 @@ describe('native review request', () => {
     const { session, agent } = autoSession(ctx, `ask-${outcome}`)
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
     session.append('turn/start', { turn: 1 })
-    const callId = brandString<ToolCallId>(`ask-${outcome}-call`)
+    const callId = ToolCallId(`ask-${outcome}-call`)
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
 
@@ -1024,7 +1022,7 @@ describe('native review request', () => {
     const { session, agent } = autoSession(ctx, 'ask-downstream-deny')
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
     session.append('turn/start', { turn: 1 })
-    const callId = brandString<ToolCallId>('ask-downstream-deny-call')
+    const callId = ToolCallId('ask-downstream-deny-call')
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
 
@@ -1070,12 +1068,12 @@ describe('native review request', () => {
       [
         { type: 'block-start', index: 0, blockType: 'tool-call' },
         {
-          type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('review-tool'),
+          type: 'tool-call-delta', index: 0, id: ToolCallId('review-tool'),
           name: 'unexpected', argumentsDelta: '{}',
         },
         {
           type: 'block-end', index: 0,
-          block: { type: 'tool-call', id: brandString<ToolCallId>('review-tool'), name: 'unexpected', arguments: '{}' },
+          block: { type: 'tool-call', id: ToolCallId('review-tool'), name: 'unexpected', arguments: '{}' },
         },
         { type: 'finish', reason: { kind: 'stop' } },
       ],
@@ -1121,7 +1119,7 @@ describe('native review request', () => {
         name: 'probe', description: 'probe', parameters: { type: 'object' },
       }
       appendHeader(session, [schema])
-      const callId = brandString<ToolCallId>(`${id}-call`)
+      const callId = ToolCallId(`${id}-call`)
       appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
       appendNativeCall(session, callId, 'probe', '{}')
       const result = await executeToolFixture(ctx, {
@@ -1153,7 +1151,7 @@ describe('native review request', () => {
     })
     const { session, agent } = autoSession(ctx, 'non-error-failure')
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-    const callId = brandString<ToolCallId>('non-error-failure-call')
+    const callId = ToolCallId('non-error-failure-call')
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
 
@@ -1180,8 +1178,8 @@ describe('PTC and bypass semantics', () => {
     setApprovalPolicy(session, 'never')
     appendHeader(session)
     appendUser(session, 'inspect only', { kind: 'user' })
-    const outerCallId = brandString<ToolCallId>('outer')
-    const subCallId = brandString<ToolCallId>('outer:code:0')
+    const outerCallId = ToolCallId('outer')
+    const subCallId = ToolCallId('outer:code:0')
     appendAssistant(session, [
       { type: 'tool-call', id: outerCallId, name: RUN_CODE_NAME, arguments: '{"code":"probe()"}' },
     ])
@@ -1248,8 +1246,8 @@ describe('PTC and bypass semantics', () => {
     ])
     const probe = registerProbe(ctx)
     const { session, agent } = autoSession(ctx, 'ptc-reused-call-id')
-    const outerCallId = brandString<ToolCallId>('reused-outer')
-    const subCallId = brandString<ToolCallId>('reused-outer:code:0')
+    const outerCallId = ToolCallId('reused-outer')
+    const subCallId = ToolCallId('reused-outer:code:0')
     session.append('turn/start', { turn: 1 })
     appendHeader(session)
     appendAssistant(session, [{
@@ -1329,26 +1327,26 @@ describe('PTC and bypass semantics', () => {
   it('does not review unscoped, non-Auto, or outer run_code executions', async () => {
     const { ctx, adapter } = await harness([])
     const probe = registerProbe(ctx)
-    const ordinary = ctx.sessions.create(brandString<SessionId>('ordinary'), { meta: { cwd: '/workspace' } })
+    const ordinary = ctx.sessions.create(SessionId('ordinary'), { meta: { cwd: '/workspace' } })
     const ordinaryAgent = agentFor(ordinary)
     const auto = autoSession(ctx, 'outer-run-code')
 
     await expect(executeToolFixture(ctx, {
       signal: new AbortController().signal,
-      callId: brandString<ToolCallId>('without-agent'),
+      callId: ToolCallId('without-agent'),
       name: 'probe',
       arguments: {},
     })).resolves.toMatchObject({ isError: false })
     await expect(executeToolFixture(ctx, {
       signal: new AbortController().signal,
-      callId: brandString<ToolCallId>('ordinary'),
+      callId: ToolCallId('ordinary'),
       name: 'probe',
       arguments: {},
       agent: ordinaryAgent,
     })).resolves.toMatchObject({ isError: false })
     await expect(executeModelToolFixture(ctx, {
       signal: new AbortController().signal,
-      callId: brandString<ToolCallId>('outer-run-code'),
+      callId: ToolCallId('outer-run-code'),
       name: RUN_CODE_NAME,
       arguments: { code: 'return 1' },
       agent: auto.agent,
@@ -1382,7 +1380,7 @@ describe('out-of-process delegation boundary', () => {
         timeline.push('provider:start')
         providerRequest = request
         return {
-          id: brandString<SessionId>('remote-boundary-child'),
+          id: SessionId('remote-boundary-child'),
           result: Promise.resolve({
             output: [{ type: 'text', text: 'remote child completed' }],
             stopReason: 'completed',
@@ -1412,7 +1410,7 @@ describe('out-of-process delegation boundary', () => {
     appendUser(session, 'Inspect this session only. Do not delegate work.', {
       kind: 'user', rpcId: 'remote-delegation-deny',
     } as never)
-    const deniedId = brandString<ToolCallId>('remote-delegation-denied')
+    const deniedId = ToolCallId('remote-delegation-denied')
     const rawArgs = JSON.stringify(args)
     appendAssistant(session, [{
       type: 'tool-call', id: deniedId, name: 'delegate_remote', arguments: rawArgs,
@@ -1435,7 +1433,7 @@ describe('out-of-process delegation boundary', () => {
     appendUser(session, 'Delegate exactly this inspection to the configured remote child.', {
       kind: 'user', rpcId: 'remote-delegation-allow',
     } as never)
-    const allowedId = brandString<ToolCallId>('remote-delegation-allowed')
+    const allowedId = ToolCallId('remote-delegation-allowed')
     session.append('step/end', { turn: 1, step: 1 })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     session.append('turn/start', { turn: 2 })
@@ -1471,7 +1469,7 @@ describe('cancellation and integration teardown', () => {
 
     await auto.restart()
 
-    expect(ctx[Context.root].fiber.state).toBe(FiberState.ACTIVE)
+    expect(ctx.root.fiber.state).toBe(FiberState.ACTIVE)
     expect(ctx.permissionPresets.current(session)).toBe('danger-full-access')
     expect(ctx.permissionPresets.names).toContain(AUTO_PRESET)
     expect(session.snapshotEvents().filter(event => event.type === 'approval/policy').at(-1)?.data)
@@ -1497,7 +1495,7 @@ describe('cancellation and integration teardown', () => {
       const sessions = ctx.sessions
       const permissionPresets = ctx.permissionPresets
       const probe = registerProbe(ctx)
-      const session = sessions.prepare(brandString<SessionId>(`shutdown-${outcome}`), { meta: { cwd: '/workspace' } })
+      const session = sessions.prepare(SessionId(`shutdown-${outcome}`), { meta: { cwd: '/workspace' } })
       const events: SessionEvent[] = []
       // A dependent of a root-provided service unloads with Auto, before the root's own effects.
       await ctx.plugin({
@@ -1520,7 +1518,7 @@ describe('cancellation and integration teardown', () => {
       ctx.permissionPresets.set(session, AUTO_PRESET)
       const agent = agentFor(session)
       appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-      const callId = brandString<ToolCallId>(`shutdown-${outcome}-call`)
+      const callId = ToolCallId(`shutdown-${outcome}-call`)
       appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
       appendNativeCall(session, callId, 'probe', '{}')
       const pending = executeToolFixture(ctx, {
@@ -1532,7 +1530,7 @@ describe('cancellation and integration teardown', () => {
       const disposal = ctx.fiber.dispose().then(() => { disposed = true })
       try {
         await cancelled.promise
-        expect(ctx[Context.root].fiber.state).toBe(FiberState.UNLOADING)
+        expect(ctx.root.fiber.state).toBe(FiberState.UNLOADING)
         expect(disposed).toBe(false)
         expect(sessions.list()).toContain(session)
         expect(events).toEqual(beforeShutdown)
@@ -1576,7 +1574,7 @@ describe('cancellation and integration teardown', () => {
     const { session, agent } = autoSession(ctx, `caller-cancel-${outcome}`)
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
     session.append('turn/start', { turn: 1 })
-    const callId = brandString<ToolCallId>(`caller-cancel-${outcome}-call`)
+    const callId = ToolCallId(`caller-cancel-${outcome}-call`)
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
     const controller = new AbortController()
@@ -1607,7 +1605,7 @@ describe('cancellation and integration teardown', () => {
       const probe = registerProbe(ctx)
       const { session, agent } = autoSession(ctx, `dispose-live-${outcome}`)
       appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-      const callId = brandString<ToolCallId>(`dispose-${outcome}-call`)
+      const callId = ToolCallId(`dispose-${outcome}-call`)
       appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
       appendNativeCall(session, callId, 'probe', '{}')
       const pending = executeToolFixture(ctx, {
@@ -1622,7 +1620,7 @@ describe('cancellation and integration teardown', () => {
 
       const afterClose = await executeToolFixture(ctx, {
         signal: new AbortController().signal,
-        callId: brandString<ToolCallId>(`after-close-${outcome}`),
+        callId: ToolCallId(`after-close-${outcome}`),
         name: 'probe',
         arguments: {},
         agent,
@@ -1650,7 +1648,7 @@ describe('cancellation and integration teardown', () => {
     const first = autoSession(ctx, 'dispose-migration-first')
     const second = autoSession(ctx, 'dispose-migration-second')
     appendHeader(second.session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-    const callId = brandString<ToolCallId>('dispose-migration-call')
+    const callId = ToolCallId('dispose-migration-call')
     appendAssistant(second.session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(second.session, callId, 'probe', '{}')
     let observedPreset: string | undefined
@@ -1704,7 +1702,7 @@ describe('cancellation and integration teardown', () => {
     })
     const { session, agent } = autoSession(ctx, 'dispose-downstream')
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-    const callId = brandString<ToolCallId>('dispose-downstream-call')
+    const callId = ToolCallId('dispose-downstream-call')
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
     const pending = executeToolFixture(ctx, {
@@ -1738,7 +1736,7 @@ describe('cancellation and integration teardown', () => {
     })
     const { session, agent } = autoSession(ctx, 'caller-cancel-no-dispatch')
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-    const callId = brandString<ToolCallId>('caller-cancel-no-dispatch-call')
+    const callId = ToolCallId('caller-cancel-no-dispatch-call')
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
 
@@ -1871,7 +1869,7 @@ describe('logged-fact failures', () => {
       } },
       { id: 'visible-log-mismatch', prepare: (session, callId) => {
         appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-        const historical = brandString<ToolCallId>('historical-mismatch')
+        const historical = ToolCallId('historical-mismatch')
         appendAssistant(session, [
           { type: 'tool-call', id: historical, name: 'shown', arguments: '{}' },
           { type: 'tool-call', id: callId, name: 'probe', arguments: '{}' },
@@ -1882,15 +1880,15 @@ describe('logged-fact failures', () => {
       { id: 'missing-historical-log', prepare: (session, callId) => {
         appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
         appendAssistant(session, [
-          { type: 'tool-call', id: brandString<ToolCallId>('missing-historical'), name: 'old', arguments: '{}' },
+          { type: 'tool-call', id: ToolCallId('missing-historical'), name: 'old', arguments: '{}' },
           { type: 'tool-call', id: callId, name: 'probe', arguments: '{}' },
         ])
         appendNativeCall(session, callId, 'probe', '{}')
       } },
       { id: 'gapped-visible-log', prepare: (session, callId) => {
         appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-        const missing = brandString<ToolCallId>('unstarted-middle')
-        const logged = brandString<ToolCallId>('impossible-later-start')
+        const missing = ToolCallId('unstarted-middle')
+        const logged = ToolCallId('impossible-later-start')
         appendAssistant(session, [
           { type: 'tool-call', id: callId, name: 'probe', arguments: '{}' },
           { type: 'tool-call', id: missing, name: 'probe', arguments: '{}' },
@@ -1901,7 +1899,7 @@ describe('logged-fact failures', () => {
       } },
       { id: 'unstarted-call-with-ptc-log', prepare: (session, callId) => {
         appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-        const later = brandString<ToolCallId>('unstarted-with-ptc')
+        const later = ToolCallId('unstarted-with-ptc')
         appendAssistant(session, [
           { type: 'tool-call', id: callId, name: 'probe', arguments: '{}' },
           { type: 'tool-call', id: later, name: RUN_CODE_NAME, arguments: '{"code":"probe()"}' },
@@ -1910,14 +1908,14 @@ describe('logged-fact failures', () => {
         session.append('tool/ptc-dispatch-start', {
           rootCallId: later,
           parentCallId: later,
-          subCallId: brandString<ToolCallId>('unstarted-with-ptc:code:1'),
+          subCallId: ToolCallId('unstarted-with-ptc:code:1'),
           name: 'probe',
           arguments: {},
         })
       } },
       { id: 'ambiguous-visible-log', prepare: (session, callId) => {
         appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-        const historical = brandString<ToolCallId>('historical-duplicate')
+        const historical = ToolCallId('historical-duplicate')
         appendAssistant(session, [
           { type: 'tool-call', id: historical, name: 'old', arguments: '{}' },
           { type: 'tool-call', id: callId, name: 'probe', arguments: '{}' },
@@ -1932,7 +1930,7 @@ describe('logged-fact failures', () => {
 
     for (const { id, prepare } of cases) {
       const { session, agent } = autoSession(ctx, id)
-      const callId = brandString<ToolCallId>(`${id}-call`)
+      const callId = ToolCallId(`${id}-call`)
       prepare(session, callId)
       const result = await executeToolFixture(ctx, {
         signal: new AbortController().signal,
@@ -1951,10 +1949,10 @@ describe('logged-fact failures', () => {
   it('reviews a Session without a header directory using the deployment fallback', async () => {
     const { ctx, adapter } = await harness([decisionChunks('{"risk":"low","decision":"allow"}')])
     const probe = registerProbe(ctx)
-    const session = ctx.sessions.create(brandString<SessionId>('missing-cwd'))
+    const session = ctx.sessions.create(SessionId('missing-cwd'))
     ctx.permissionPresets.set(session, AUTO_PRESET)
     appendHeader(session, [{ name: 'probe', description: 'probe', parameters: { type: 'object' } }])
-    const callId = brandString<ToolCallId>('missing-cwd-call')
+    const callId = ToolCallId('missing-cwd-call')
     appendAssistant(session, [{ type: 'tool-call', id: callId, name: 'probe', arguments: '{}' }])
     appendNativeCall(session, callId, 'probe', '{}')
     const result = await executeToolFixture(ctx, {
@@ -2009,7 +2007,7 @@ describe('logged-fact failures', () => {
           name: 'probe', arguments: {},
         })
       } },
-      { id: 'wrong-root', execute: { root: brandString<ToolCallId>('different-root') }, starts: (session, outer, inner) => {
+      { id: 'wrong-root', execute: { root: ToolCallId('different-root') }, starts: (session, outer, inner) => {
         session.append('tool/ptc-dispatch-start', {
           rootCallId: outer, parentCallId: outer, subCallId: inner,
           name: 'probe', arguments: {},
@@ -2053,8 +2051,8 @@ describe('logged-fact failures', () => {
     for (const item of cases) {
       const { session, agent } = autoSession(ctx, `ptc-${item.id}`)
       appendHeader(session)
-      const outer = brandString<ToolCallId>(`${item.id}-outer`)
-      const inner = brandString<ToolCallId>(`${item.id}-inner`)
+      const outer = ToolCallId(`${item.id}-outer`)
+      const inner = ToolCallId(`${item.id}-inner`)
       if (item.showParent !== false) {
         appendAssistant(session, [
           { type: 'tool-call', id: outer, name: RUN_CODE_NAME, arguments: '{"code":"probe()"}' },

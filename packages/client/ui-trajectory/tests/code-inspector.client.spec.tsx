@@ -143,10 +143,10 @@ describe('PTC trajectory inspector', () => {
     }
   })
 
-  it.each(['run_code', 'cua_run_code'])('shows the %s description, numbered source, original arguments, and verbatim output', (toolName) => {
-    const view = render(<Harness cell={{ ...CELL, toolName, text: `${toolName} · ${ARGS}` }} />)
+  it('shows the description, numbered source, original arguments, and verbatim output', () => {
+    const view = render(<Harness />)
     const ui = within(view.container)
-    fireEvent.click(ui.getByRole('row', { name: new RegExp(`${toolName} Read the working directory`) }))
+    fireEvent.click(ui.getByRole('row', { name: /run_code Read the working directory/ }))
     expect(ui.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Summary', 'Code', 'Result', 'Schema', 'Timing'])
     expect(ui.getByRole('tabpanel').textContent).toContain('Read the working directory')
     expect(view.container.querySelector('[data-line-numbers] pre')?.textContent).toBe(SOURCE.trimEnd())

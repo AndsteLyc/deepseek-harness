@@ -3,10 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { type SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { RetryId } from '@deepseek-ai/dsh-llm-retry/types'
+import { RetryId } from '@deepseek-ai/dsh-llm-retry'
 import type {} from '../src/index.ts'
 
 const dirs: string[] = []
@@ -28,7 +27,7 @@ describe('JSONL retry-event persistence', () => {
   it('round-trips the event losslessly without adding a model message', async () => {
     const ctx = await backend()
     try {
-      const session = ctx.sessions.create(brandString<SessionId>('retry-jsonl'))
+      const session = ctx.sessions.create(SessionId('retry-jsonl'))
       const handle = await ctx.sessionPersistence.create(session.header)
       session.append('turn/start', { turn: 1 })
       session.append('step/start', { turn: 1, step: 1 })
@@ -37,7 +36,7 @@ describe('JSONL retry-event persistence', () => {
         reason: 'initial',
       })
       const event = session.append('llm/retry', {
-        retryId: brandString<RetryId>('retry-jsonl-chain'),
+        retryId: RetryId('retry-jsonl-chain'),
         turn: 1,
         step: 1,
         provider: 'mock',

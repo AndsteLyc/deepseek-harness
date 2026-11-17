@@ -16,11 +16,10 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SubprocessHandle } from '@deepseek-ai/dsh-subprocess'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import * as claudeCode from '../src/index.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 const execFileAsync = promisify(execFile)
 const OFFICIAL_DEEPSEEK_MESSAGES_BASE_URL = 'https://api.deepseek.com/anthropic'
@@ -131,7 +130,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)(
       expect(version.stdout.trim()).toBe('2.1.263 (Claude Code)')
 
       const nonce = `DSH_CLAUDE_DEEPSEEK_${randomUUID()}`
-      const parent = await harness.create(brandString<SessionId>('deepseek-e2e-parent'), {}, { cwd: workspace })
+      const parent = await harness.create(SessionId('deepseek-e2e-parent'), {}, { cwd: workspace })
       const run = await startExternalActivation(ctx, 'claude-code', {
         prompt: [{
           type: 'text',

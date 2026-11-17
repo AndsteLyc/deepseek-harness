@@ -1,11 +1,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import { AgentModel, modelSelectionProjectionDefinition } from '@deepseek-ai/dsh-agent'
 import AgentRegistry, { type ModelSelection } from '@deepseek-ai/dsh-agent'
-import SessionStore, { type SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ReasoningEffortId, LlmRuntime } from '@deepseek-ai/dsh-llm'
+import { ReasoningEffortId, type LlmRuntime } from '@deepseek-ai/dsh-llm'
 import { AcpModelControl } from '../src/model-control.ts'
 
 /** Minimal LLM catalog/runtime double for pure standard-option tests. */
@@ -17,8 +16,8 @@ function llmRuntime(overrides: Partial<LlmRuntime> = {}): LlmRuntime {
       provider: selection.provider ?? 'mock',
       model: selection.model ?? 'mock',
       ...selection.reasoningEffort === undefined
-        ? { reasoningEffort: brandString<ReasoningEffortId>('high') }
-        : { reasoningEffort: brandString<ReasoningEffortId>(selection.reasoningEffort) },
+        ? { reasoningEffort: ReasoningEffortId('high') }
+        : { reasoningEffort: ReasoningEffortId(selection.reasoningEffort) },
     }),
     resolveModelInfo: (provider: string, model: string) => Promise.resolve({
       provider,
@@ -26,14 +25,14 @@ function llmRuntime(overrides: Partial<LlmRuntime> = {}): LlmRuntime {
       name: model,
       reasoning: {
         efforts: [
-          { id: brandString<ReasoningEffortId>('low'), name: 'Low', description: 'Less thought.' },
-          { id: brandString<ReasoningEffortId>('high'), name: 'High' },
+          { id: ReasoningEffortId('low'), name: 'Low', description: 'Less thought.' },
+          { id: ReasoningEffortId('high'), name: 'High' },
         ],
-        defaultEffort: brandString<ReasoningEffortId>('high'),
+        defaultEffort: ReasoningEffortId('high'),
       },
     }),
     ...overrides,
-  } as LlmRuntime
+  } as unknown as LlmRuntime
 }
 
 async function createControl(runtime: LlmRuntime, initial?: ModelSelection) {
@@ -42,7 +41,7 @@ async function createControl(runtime: LlmRuntime, initial?: ModelSelection) {
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
-  const session = ctx.sessions.create(brandString<SessionId>('model-control'))
+  const session = ctx.sessions.create(SessionId('model-control'))
   const options = initial ?? {}
   const projection = await ctx.sessionProjections.register(modelSelectionProjectionDefinition)
   const model = new AgentModel(() => projection.stateOf(session), session, options)
@@ -119,7 +118,7 @@ describe('ACP model configuration control', () => {
         model: selection.model ?? 'mock',
         ...selection.reasoningEffort === undefined
           ? {}
-          : { reasoningEffort: brandString<ReasoningEffortId>(selection.reasoningEffort) },
+          : { reasoningEffort: ReasoningEffortId(selection.reasoningEffort) },
       }),
       resolveModelInfo: (provider: string, model: string) => Promise.resolve({
         provider,
@@ -127,8 +126,8 @@ describe('ACP model configuration control', () => {
         name: model,
         reasoning: {
           efforts: [
-            { id: brandString<ReasoningEffortId>('low'), name: 'Low' },
-            { id: brandString<ReasoningEffortId>('high'), name: 'High' },
+            { id: ReasoningEffortId('low'), name: 'Low' },
+            { id: ReasoningEffortId('high'), name: 'High' },
           ],
         },
       }),

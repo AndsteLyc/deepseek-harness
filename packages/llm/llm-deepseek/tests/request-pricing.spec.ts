@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { offloadedImageText, requestImageHandleText, textOnlyImageText } from '@deepseek-ai/dsh-llm'
 import type { ImageBlock } from '@deepseek-ai/dsh-llm'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { AttachmentId } from '@deepseek-ai/dsh-attachment/types'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { deepSeekImageRequestPricing } from '../src/request-pricing.ts'
 import { resolveAdapterOptions } from '../src/index.ts'
@@ -16,7 +15,7 @@ const VISION_MODEL = {
 
 function ref(name: string, width: number, height: number, bytes = 1024): ImageAttachmentRef {
   return {
-    attachmentId: brandString<AttachmentId>(`sha256:${name.padEnd(8, '0')}`),
+    attachmentId: AttachmentId(`sha256:${name.padEnd(8, '0')}`),
     mediaType: 'image/png',
     bytes,
     width,

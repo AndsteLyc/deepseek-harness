@@ -1,4 +1,4 @@
-/** Computer-use provider identities. @module @deepseek-ai/dsh-computer-use/src/brand.ts */
+/** Computer-use provider identities. @module @deepseek-ai/dsh-computer-use/brand */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
 

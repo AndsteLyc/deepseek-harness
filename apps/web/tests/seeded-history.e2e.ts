@@ -18,7 +18,7 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { createLaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
 import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, ContextFormed, Message, MessageSource } from '@deepseek-ai/dsh-llm'
-import { deriveEventMessage, type SessionId } from '@deepseek-ai/dsh-session'
+import { deriveEventMessage, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
 import type {} from '@deepseek-ai/dsh-api-terminal-controller'
@@ -30,7 +30,6 @@ import {
   webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { expandOwningTurnProcess, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot, WEB_FIXTURE_TIME } from './support.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -326,7 +325,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     // production Session Controller against the booted real host.
     const controller = new AbortController()
     const stream = scaffold.ctx.sessionController.follow({
-      address: { kind: 'session', sessionId: brandString<SessionId>(SEED_ID) },
+      address: { kind: 'session', sessionId: SessionId(SEED_ID) },
     }, controller.signal)[Symbol.asyncIterator]()
     const first = await stream.next()
     controller.abort()
@@ -400,10 +399,10 @@ describe('web e2e: seeded history renders through cold resume', () => {
     expect(await page.getByText(PROMPT, { exact: true }).count()).toBe(1)
 
     await expect.poll(
-      () => scaffold.ctx.agents.get(brandString<SessionId>(SEED_ID)) !== undefined,
+      () => scaffold.ctx.agents.get(SessionId(SEED_ID)) !== undefined,
       { timeout: 10_000 },
     ).toBe(true)
-    const agent = scaffold.ctx.agents.get(brandString<SessionId>(SEED_ID))
+    const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
     if (agent === undefined) throw new Error('seeded session did not attach an agent')
     const injected = agent.session.append('user/message', createUserMessage({
       content: [{
@@ -489,7 +488,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
   })
 
   it.skipIf(MODE === 'record')('shows ordinary instructions as one collapsed Context row that expands to their logged content', async () => {
-    const session = scaffold.ctx.sessions.get(brandString<SessionId>(SEED_ID))
+    const session = scaffold.ctx.sessions.get(SessionId(SEED_ID))
     if (session === undefined) throw new Error('seeded session is unavailable')
     const instructions = session.snapshotEvents().filter(event => event.type === 'user/message'
       && event.data.source.kind === 'agent-instructions')
@@ -764,7 +763,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     await expect.poll(() => access.isEnabled(), { timeout: 10_000 }).toBe(true)
     const row = page.locator('[data-variant="others"]').filter({ hasText: 'preset read-only' })
     expect(await row.count()).toBe(0)
-    const agent = scaffold.ctx.agents.get(brandString<SessionId>(SEED_ID))
+    const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
     if (agent === undefined) throw new Error('seeded session did not attach an agent')
     const events = agent.session.snapshotEvents()
     const run = events.findLast(event => event.type === 'command/run' && event.data.name === 'permission')
@@ -793,7 +792,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
       await disclosure.click()
       await expect.poll(() => disclosure.getAttribute('aria-expanded')).toBe('true')
 
-      const agent = scaffold.ctx.agents.get(brandString<SessionId>(SEED_ID))
+      const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
       if (agent === undefined) throw new Error('seeded session did not attach an agent')
       const done = agent.session.snapshotEvents().filter(event => event.type === 'command/done').at(-1)
       if (done?.type !== 'command/done') throw new Error('feedback command did not settle')
@@ -818,7 +817,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
   }, 60_000)
 
   it.skipIf(MODE === 'record')('shows short injected context as a collapsed Context row without dropping the event', async () => {
-    const agent = scaffold.ctx.agents.get(brandString<SessionId>(SEED_ID))
+    const agent = scaffold.ctx.agents.get(SessionId(SEED_ID))
     if (agent === undefined) throw new Error('seeded session did not attach an agent')
     const contextRows = page.locator('[data-chat-flow-kind="context"]')
     const before = await contextRows.count()
@@ -864,7 +863,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-terminal-unavailable'))
     await page.locator('[data-dockkit-add-tab]').click()
     await page.locator('[data-sidebar-right-guide-entry="terminal"]').getByRole('button', { name: /^New terminal/u }).click()
-    const sessionId = brandString<SessionId>(SEED_ID)
+    const sessionId = SessionId(SEED_ID)
     const terminals = () => scaffold.ctx.terminalController.list(sessionId)
     await expect.poll(() => terminals().length).toBe(1)
     const previous = terminals()[0]!.id
@@ -890,7 +889,7 @@ describe('web e2e: seeded history renders through cold resume', () => {
 
   it.skipIf(MODE === 'record')('omits blank reasoning rows around recorded text in an appended fixture turn', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-seeded-blank-reasoning'))
-    const session = scaffold.ctx.sessions.get(brandString<SessionId>(SEED_ID))
+    const session = scaffold.ctx.sessions.get(SessionId(SEED_ID))
     if (session === undefined) throw new Error('seeded session is unavailable')
     const events = session.snapshotEvents()
     const recorded = events.flatMap(event => event.type === 'assistant/message' ? event.data.message.content : [])

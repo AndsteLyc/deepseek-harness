@@ -41,17 +41,12 @@ describe('CI workflow', () => {
     })
     expect(workflowJob(ci, 'all-checks-passed').needs).toContain('node-compat')
     const ordinaryJobs = Object.entries(ci.jobs)
-      .filter(([name]) => !['node-compat', 'all-checks-passed', 'publisher-isolated'].includes(name))
+      .filter(([name]) => !['node-compat', 'all-checks-passed'].includes(name))
     for (const [name, job] of ordinaryJobs) {
       if (!isRecord(job)) throw new TypeError(`${name} must define a job`)
       expect(job).not.toHaveProperty('strategy')
       expect(job).not.toHaveProperty('uses')
     }
-    // Publisher smoke reuses the compatibility/build concurrency slots before those jobs start.
-    expect(compatibility.needs).toBe('publisher-isolated')
-    expect(workflowJob(ci, 'publisher-isolated').strategy).toMatchObject({ 'max-parallel': 1, matrix: { os: ['linux', 'macos'] } })
-    expect(workflowJob(ciWindows, 'windows-build').needs).toBe('windows-publisher')
-    expect(workflowJob(ciWindows, 'windows-publisher').defaults).toEqual({ run: { shell: 'pwsh' } })
     // Python reports its own required verdict, so neither its jobs nor a
     // reusable workflow caller remain in the Linux or Windows workflow.
     expect(Object.keys(ci.jobs).filter(name => name.startsWith('python'))).toEqual([])
@@ -65,7 +60,7 @@ describe('CI workflow', () => {
     expect(runtime.with).toMatchObject({ targets: 'node24-linux-x64,node24-win-x64' })
     expect(runtime.uses).toBe('./.github/workflows/build-exe-for-python-sdk.yml')
     const windowsJobs = Object.entries(ciWindows.jobs)
-      .filter(([name]) => !['windows-checks-passed', 'windows-publisher'].includes(name))
+      .filter(([name]) => name !== 'windows-checks-passed')
     for (const [name, job] of windowsJobs) {
       if (!isRecord(job)) throw new TypeError(`${name} must define a job`)
       expect(job).not.toHaveProperty('strategy')
@@ -100,7 +95,7 @@ describe('CI workflow', () => {
     expect(afterSdk).toBeLessThanOrEqual(11)
   })
 
-  it('keeps required PR verdicts covering runtime and publisher jobs', () => {
+  it('keeps the union of required PR verdicts equal to the pre-split blocking set', () => {
     const verdicts = [
       ['ci.yml', 'all-checks-passed'],
       ['ci-windows.yml', 'windows-checks-passed'],
@@ -117,7 +112,9 @@ describe('CI workflow', () => {
       expect(verdict.needs.every(id => typeof id === 'string' && id in jobs)).toBe(true)
       blocking.push(...(verdict.needs as string[]))
     }
-    // Every blocking lane must contribute to a branch-protection verdict.
+    // Splitting the workflows only moves jobs between verdicts; the blocking
+    // set itself must stay identical, or branch protection would accept a
+    // failure it rejected before the split.
     expect(blocking.sort()).toEqual([
       'node-24',
       'node-24-bench',
@@ -125,12 +122,10 @@ describe('CI workflow', () => {
       'node-24-coverage',
       'node-24-lint',
       'node-compat',
-      'publisher-isolated',
       'python-runtime',
       'python-sdk',
       'windows-build',
       'windows-native-tests',
-      'windows-publisher',
     ])
   })
 
@@ -552,7 +547,7 @@ describe('CI workflow', () => {
     expect(aggregate.needs).not.toContain('windows')
     // windows-coverage is temporarily non-blocking while Windows ACP
     // half-close tests are stabilized; observational stays out too.
-    expect(windowsAggregate.needs).toEqual(['windows-publisher', 'windows-build', 'windows-native-tests'])
+    expect(windowsAggregate.needs).toEqual(['windows-build', 'windows-native-tests'])
     expect(windowsAggregate.name).toBe('windows checks passed')
     expect(windowsAggregate['runs-on']).toBe(aggregate['runs-on'])
     expect(windowsAggregate.if).toBe(aggregate.if)

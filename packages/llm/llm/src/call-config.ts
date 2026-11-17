@@ -6,7 +6,8 @@
  * @module dsh-llm/call-config
  */
 
-import type { GenerateOptions, LlmResolvedModelInfo, ReasoningEffortId } from './types.ts'
+import type { GenerateOptions, LlmResolvedModelInfo } from './types.ts'
+import type { ReasoningEffortId } from './brand.ts'
 
 /** Process-local identities of request objects assembled by dsh-agent-loop. */
 const AGENT_LOOP_REQUESTS = new WeakSet<GenerateOptions>()

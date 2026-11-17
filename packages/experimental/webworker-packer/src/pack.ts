@@ -28,7 +28,8 @@ import {
   type ImageLazyArchive, type ImageManifest,
 } from '@deepseek-ai/dsh-experimental-webworker-runtime'
 import picomatch from 'picomatch'
-import { parseEntryYaml, stringifyEntryYaml, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
+import yaml from 'js-yaml'
+import { entryListSchema, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { PROFILE_PATCH_FILENAME } from '@deepseek-ai/dsh-app-boot'
 import { WRAPPER_CONTRACT, type ImageFiles, type TransformOutcome } from './transform-image.ts'
 import { EXCLUDE, EXCLUDE_WORKSPACE, IMAGE_ENTRY_SEEDS, PAGE_ASSETS } from './rules.ts'
@@ -206,7 +207,7 @@ function treeRosterOf(root: string): string[] {
         continue
       }
       if (!entry.name.endsWith('.yml') && !entry.name.endsWith('.yaml')) continue
-      collectModuleNames(parseEntryYaml(readFileSync(absolute, 'utf8')), names)
+      collectModuleNames(yaml.load(readFileSync(absolute, 'utf8'), { schema: entryListSchema }), names)
     }
   }
   walk(root)
@@ -696,7 +697,7 @@ export function packVfsImage(options: PackOptions): PackResult {
     files[`node_modules/${installation.name}/package.json`] = readFileSync(installation.manifest)
   }
   if (options.homePatch !== undefined && options.homePatch.length > 0) {
-    files[HOME_PATCH_PATH] = encoder.encode(stringifyEntryYaml(options.homePatch))
+    files[HOME_PATCH_PATH] = encoder.encode(yaml.dump(options.homePatch, { schema: entryListSchema, noRefs: true }))
   }
 
   for (const tree of configTrees) collectTree(tree.directory, files, tree.mount, relativePath => !excluded(relativePath))

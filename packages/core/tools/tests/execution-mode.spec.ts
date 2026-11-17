@@ -4,8 +4,7 @@ import { ToolExecutionPipeline } from '@deepseek-ai/dsh-tools/pipeline'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { type ToolDefinition, type ToolExecutionInput, type ToolExecutionMode } from '@deepseek-ai/dsh-tools'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tool-testkit'
@@ -21,7 +20,7 @@ async function setup() {
 }
 
 function exec(name: string, args: unknown): ToolExecutionInput {
-  return { signal: testToolSignal, callId: brandString<ToolCallId>('c1'), name, arguments: args }
+  return { signal: testToolSignal, callId: ToolCallId('c1'), name, arguments: args }
 }
 
 describe('ToolExecutionPipeline.executionMode', () => {

@@ -4,12 +4,11 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { Session, type SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title/types'
 import SessionTitleService, {
+  SessionTitleProviderId,
   foldSessionTitle,
   type SessionTitleProviderRequest,
 } from '@deepseek-ai/dsh-session-title'
@@ -38,7 +37,7 @@ describe('SessionTitleService.rename', () => {
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionTitleService, CONFIG)
-    const session = ctx.sessions.create(brandString<SessionId>('rename-accept'))
+    const session = ctx.sessions.create(SessionId('rename-accept'))
     session.append('turn/start', { turn: 1 })
     appendHumanPrompt(session, 'Original prompt text')
     await settle()
@@ -65,10 +64,10 @@ describe('SessionTitleService.rename', () => {
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionTitleService, CONFIG)
-    const session = ctx.sessions.create(brandString<SessionId>('rename-reject'))
+    const session = ctx.sessions.create(SessionId('rename-reject'))
     expect(() => ctx.sessionTitle.rename(session, '  [31m  ')).toThrow(/visible characters/)
 
-    expect(() => ctx.sessionTitle.rename(Session.create(brandString<SessionId>('detached')), 'name'))
+    expect(() => ctx.sessionTitle.rename(Session.create(SessionId('detached')), 'name'))
       .toThrow(/not live in this store/)
   })
 
@@ -83,11 +82,11 @@ describe('SessionTitleService.rename', () => {
       messageSeqs: request.messages.map(message => message.seq),
     }))
     ctx.sessionTitle.register({
-      id: brandString<SessionTitleProviderId>('pin-provider'),
+      id: SessionTitleProviderId('pin-provider'),
       automatic: 'all-prompts',
       generate,
     })
-    const session = ctx.sessions.create(brandString<SessionId>('rename-pin'))
+    const session = ctx.sessions.create(SessionId('rename-pin'))
     session.append('turn/start', { turn: 1 })
     appendHumanPrompt(session, 'First prompt')
     await settle()
@@ -117,7 +116,7 @@ describe('SessionTitleService.rename', () => {
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(SessionTitleService, CONFIG)
-    const session = ctx.sessions.create(brandString<SessionId>('rename-unpin-fallback'))
+    const session = ctx.sessions.create(SessionId('rename-unpin-fallback'))
     session.append('turn/start', { turn: 1 })
     appendHumanPrompt(session, 'Derivable prompt words')
     await settle()
@@ -151,11 +150,11 @@ describe('SessionTitleService.rename', () => {
       return { title: 'Late provider title', messageSeqs: request.messages.map(message => message.seq) }
     })
     ctx.sessionTitle.register({
-      id: brandString<SessionTitleProviderId>('deferred-provider'),
+      id: SessionTitleProviderId('deferred-provider'),
       automatic: 'all-prompts',
       generate,
     })
-    const session = ctx.sessions.create(brandString<SessionId>('rename-supersede'))
+    const session = ctx.sessions.create(SessionId('rename-supersede'))
     session.append('turn/start', { turn: 1 })
     appendHumanPrompt(session, 'Prompt that triggers generation')
     session.append('request/header', {
@@ -183,7 +182,7 @@ describe('SessionTitleService.rename', () => {
     // A 3-byte fallback cap cannot hold the 4-byte emoji prompt: the
     // re-derived fallback is empty, so the pinned title survives the refresh.
     await ctx.plugin(SessionTitleService, { ...CONFIG, fallbackMaxBytes: 3 })
-    const session = ctx.sessions.create(brandString<SessionId>('rename-unpin-empty'))
+    const session = ctx.sessions.create(SessionId('rename-unpin-empty'))
     session.append('turn/start', { turn: 1 })
     appendHumanPrompt(session, '😀😀')
     await settle()

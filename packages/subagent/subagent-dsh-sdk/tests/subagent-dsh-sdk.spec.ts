@@ -25,8 +25,7 @@ import {
 import { createProcessDeepSeekHarness } from '../../../sdk/client/src/api.ts'
 import type { RuntimeProcessOptions } from '../../../sdk/client/src/launch.ts'
 import type { DeepSeekHarnessOptions } from '@deepseek-ai/dsh-sdk-client'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm/types'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import * as sdk from '../src/index.ts'
 import {
   DEFAULT_DISPOSE_EOF_GRACE_MS,
@@ -225,7 +224,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     try {
       const ctx = await setup({ FAKE_RECORD_INIT: recordFile }, { maxTokens: 4096 })
       const run = await startExternalActivation(ctx, 'dsh-sdk', request('partial', new AbortController().signal, {
-        reasoningEffort: brandString<ReasoningEffortId>('high'),
+        reasoningEffort: ReasoningEffortId('high'),
       }))
       await run.result
       await run.dispose()
@@ -252,13 +251,13 @@ describe('dsh-subagent-dsh-sdk provider', () => {
         startExternalActivation(ctx, 'dsh-sdk', request('first', new AbortController().signal, {
           provider: 'provider-a',
           model: 'model-a',
-          reasoningEffort: brandString<ReasoningEffortId>('high'),
+          reasoningEffort: ReasoningEffortId('high'),
           maxTokens: 111,
         })),
         startExternalActivation(ctx, 'dsh-sdk', request('second', new AbortController().signal, {
           provider: 'provider-b',
           model: 'model-b',
-          reasoningEffort: brandString<ReasoningEffortId>('max'),
+          reasoningEffort: ReasoningEffortId('max'),
           maxTokens: 222,
         })),
       ])

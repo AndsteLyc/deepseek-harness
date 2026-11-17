@@ -2,7 +2,8 @@
 
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { parseEntryYaml } from '@deepseek-ai/cordis-plugin-include'
+import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
+import * as yaml from 'js-yaml'
 
 describe('Inspector profile bundle', () => {
   it('publishes one layer containing both inspectors and the Statistics view', () => {
@@ -18,7 +19,9 @@ describe('Inspector profile bundle', () => {
       '@deepseek-ai/dsh-experimental-inspector': 'workspace:*',
       '@deepseek-ai/dsh-experimental-session-inspector': 'workspace:*',
     })
-    expect(parseEntryYaml(readFileSync(new URL(`../${manifest.dsh.bundle.patch}`, import.meta.url), 'utf8'))).toEqual([{ insert: [
+    expect(yaml.load(readFileSync(new URL(`../${manifest.dsh.bundle.patch}`, import.meta.url), 'utf8'), {
+      schema: entryListSchema,
+    })).toEqual([{ insert: [
       {
         id: 'experimental-inspector', name: '@deepseek-ai/dsh-experimental-inspector',
         disabled: false, config: { captureFetch: true },

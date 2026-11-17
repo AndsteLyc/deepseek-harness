@@ -1,10 +1,9 @@
 /** Current installed Session validation used after vocabulary-aware format restoration. */
 
-import { brandString } from '@deepseek-ai/dsh-brand'
 import {
   SESSION_FORMAT_VERSION,
   Session,
-  type SessionId,
+  SessionId,
   SessionLogOffset,
 } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
@@ -23,7 +22,7 @@ export function validateInstalledCurrentSessionHeader(header: SessionFormatHeade
     )
   }
   Session.fromRestore(
-    brandString<SessionId>(header.id),
+    SessionId(header.id),
     [],
     header as unknown as SessionHeader,
     SessionLogOffset(0),
@@ -43,7 +42,7 @@ export function validateInstalledCurrentSessionArtifact(artifact: SessionFormatA
     )
   }
   Session.fromRestore(
-    brandString<SessionId>(artifact.header.id),
+    SessionId(artifact.header.id),
     artifact.events as SessionEvent[],
     artifact.header as unknown as SessionHeader,
     SessionLogOffset(artifact.inheritedEventCount),

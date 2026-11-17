@@ -7,10 +7,8 @@ import UserQuestionService, {
   type AskUserQuestionAnswer,
   type AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import { HarnessError } from '@deepseek-ai/dsh-error'
-import { createToolResultMessage, createUserMessage, type ToolCallId, type ToolSchema, type UserMessage } from '@deepseek-ai/dsh-llm'
-import { Session, type SessionId, SESSION_FORMAT_VERSION, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
+import { createToolResultMessage, createUserMessage, ToolCallId, type ToolSchema, type UserMessage } from '@deepseek-ai/dsh-llm'
+import { Session, SessionId, SESSION_FORMAT_VERSION, TOOL_OUTCOME_UNKNOWN } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 interface QuestionAnswerer {
@@ -35,7 +33,7 @@ function provider(answer = 'approved'): QuestionAnswerer & { seen: AskUserQuesti
 }
 
 function stubAgent(id: string, delegationDepth = 0, origin?: 'subagent'): Agent {
-  const agentId = brandString<SessionId>(id)
+  const agentId = SessionId(id)
   return {
     id: agentId,
     session: Session.create(agentId, undefined, {
@@ -175,21 +173,19 @@ describe('UserQuestionService', () => {
   })
 
   it.each([
-    ['an ordinary Error', new Error('provider failed'), 'provider failed'],
+    ['an ordinary Error', new Error('provider failed')],
     ['a namesake Error without a string code', Object.assign(new Error('provider failed'), {
       name: 'UserQuestionError',
-    }), 'provider failed'],
-    ['a non-Error rejection', { name: 'UserQuestionError', code: 'ASK_CANCELLED' }, 'the user-questions answerer failed before the user answered'],
-  ])('classifies %s from the provider as PROVIDER_ERROR', async (_label, rejection, message) => {
+    })],
+    ['a non-Error rejection', { name: 'UserQuestionError', code: 'ASK_CANCELLED' }],
+  ])('preserves %s from the provider', async (_label, rejection) => {
     const ctx = new Context()
     await ctx.plugin(UserQuestionService)
     registerAnswerer(ctx, { ask: vi.fn().mockRejectedValue(rejection) })
 
-    const failure = await ctx.userQuestions.ask({
+    await expect(ctx.userQuestions.ask({
       questions: [{ id: 'confirm', question: 'Proceed?' }],
-    }).then(() => undefined, (error: unknown) => error)
-    expect(failure).toBeInstanceOf(UserQuestionError)
-    expect(failure).toMatchObject({ name: 'UserQuestionError', code: 'PROVIDER_ERROR', message, cause: rejection })
+    })).rejects.toBe(rejection)
   })
 
   it('rejects empty question batches before reaching the provider', async () => {
@@ -293,10 +289,10 @@ describe('UserQuestionService', () => {
     })
   })
 
-  it('preserves a coded provider rejection outside the UserQuestionError taxonomy', async () => {
+  it('preserves a provider rejection outside the UserQuestionError taxonomy', async () => {
     const ctx = new Context()
     await ctx.plugin(UserQuestionService)
-    const failure = new HarnessError('provider failed', 'PROVIDER_OFFLINE')
+    const failure = new Error('provider failed')
     registerAnswerer(ctx, { ask: () => Promise.reject(failure) })
 
     await expect(ctx.userQuestions.ask({
@@ -390,7 +386,7 @@ function liveAgent(id: string): LiveAgent {
   const steer = vi.fn<(message: UserMessage) => void>((message) => { queuedMessages.push(message) })
   const inject = vi.fn<(message: UserMessage) => void>()
   return Object.assign(stubAgent(id), {
-    session: Session.create(brandString<SessionId>(id)),
+    session: Session.create(SessionId(id)),
     inbox: { nextTurn: queuedTurns, nextStep: queuedMessages },
     steer,
     inject,
@@ -408,7 +404,7 @@ async function timedContext(): Promise<Context> {
 }
 
 const timedQuestions = [{ id: 'scope', question: 'Which scope?', options: [{ label: 'Tool only' }] }]
-const timedCallId = brandString<ToolCallId>('ask-timed')
+const timedCallId = ToolCallId('ask-timed')
 
 function replyText(message: UserMessage): unknown {
   const block = message.content[0]
@@ -425,7 +421,7 @@ describe('askTimed', () => {
     const agent = liveAgent('timed-sibling-waits')
     ctx.agents.enter(agent)
     const service = ctx.userQuestions
-    const laterCallId = brandString<ToolCallId>('ask-later')
+    const laterCallId = ToolCallId('ask-later')
     const first = service.askTimed({ agent, questions: timedQuestions }, timedCallId, 1_000)
     const later = service.askTimed({ agent, questions: timedQuestions }, laterCallId, 2_000)
     const cancelled = expect(later).rejects.toMatchObject({ code: 'ASK_ABORTED' })
@@ -572,15 +568,14 @@ describe('askTimed', () => {
     }
   })
 
-  it('classifies a provider failure that is not a question error as PROVIDER_ERROR', async () => {
+  it('rethrows a provider failure that is not a question error', async () => {
     const ctx = await timedContext()
     const agent = liveAgent('timed-provider-crash')
     ctx.agents.enter(agent)
-    const crash = new TypeError('provider crashed')
-    registerAnswerer(ctx, { ask: () => Promise.reject(crash) })
+    registerAnswerer(ctx, { ask: () => Promise.reject(new TypeError('provider crashed')) })
 
     await expect(ctx.userQuestions.askTimed({ agent, questions: timedQuestions }, timedCallId, 120_000))
-      .rejects.toMatchObject({ name: 'UserQuestionError', code: 'PROVIDER_ERROR', message: 'provider crashed', cause: crash })
+      .rejects.toThrow(TypeError)
     await ctx.fiber.dispose()
   })
 
@@ -672,7 +667,7 @@ describe('late replies', () => {
   it('accepts steers for different continued batches while both await the next step', async () => {
     const ctx = await timedContext()
     const agent = liveAgent('late-out-of-order')
-    const secondCallId = brandString<ToolCallId>('another-timed-batch')
+    const secondCallId = ToolCallId('another-timed-batch')
     ctx.agents.enter(agent)
     askInLog(agent, timedCallId)
     continueInLog(agent, timedCallId)
@@ -779,11 +774,11 @@ describe('late replies', () => {
     const batch = { answers: [{ id: 'scope', selected: ['Tool only'] }] }
     const other = createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'other' }] })
     const otherReply = createUserMessage({
-      source: { kind: 'user-question-reply', callId: brandString<ToolCallId>('other-call'), outcome: 'answered' },
+      source: { kind: 'user-question-reply', callId: ToolCallId('other-call'), outcome: 'answered' },
       content: [{ type: 'text', text: 'other reply' }],
     })
     const events = agentEvents(ctx, agent)
-    const otherSession = Session.create(brandString<SessionId>('other-session'))
+    const otherSession = Session.create(SessionId('other-session'))
     const otherEnd = otherSession.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     ctx.emit('session/event', otherSession, otherEnd)
     events.emit('agent/inbox/claimed', { message: otherReply, turn: 1 })
@@ -867,7 +862,7 @@ describe('late replies', () => {
     askInLog(agent, timedCallId)
 
     expect(ctx.userQuestions.answer(agent, timedCallId, { answers: [] })).toBe(false)
-    expect(ctx.userQuestions.answer(agent, brandString<ToolCallId>('never-asked'), { answers: [] })).toBe(false)
+    expect(ctx.userQuestions.answer(agent, ToolCallId('never-asked'), { answers: [] })).toBe(false)
     expect(agent.steer).not.toHaveBeenCalled()
     expect(agent.inject).not.toHaveBeenCalled()
     await ctx.fiber.dispose()
@@ -954,7 +949,7 @@ describe('fixed approval presentation', () => {
     const questions = kind === 'multiple' ? [item, { ...item, id: 'other' }]
       : kind === 'detail' ? [withoutDetail] : [{ ...item, multiSelect: kind === 'multiselect' }]
     await expect(ctx.userQuestions.ask({ questions,
-      ...(kind === 'timed' ? { wait: { callId: brandString<ToolCallId>('call') } } : {}),
+      ...(kind === 'timed' ? { wait: { callId: ToolCallId('call') } } : {}),
     })).rejects.toMatchObject({ code: 'BAD_INTENT', message })
     expect(p.seen).toEqual([])
   })

@@ -18,7 +18,7 @@ import {
   type Profile,
 } from '@deepseek-ai/dsh-app-boot'
 import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
-import { type SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
+import { SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from 'vitest'
@@ -28,8 +28,7 @@ import { createPluginProfile } from '../../desktop/src/project-manager.ts'
 const SETTINGS_NAMESPACE = 'agent-preset-registry'
 const SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE = 'subagent-model-selection-settings'
 import { applyChildComposition, childSessionMeta } from '@deepseek-ai/dsh-subagent'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import { type ToolCallId, LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, LlmAdapter, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-compaction-basic'
 import { codePointLength } from '@deepseek-ai/dsh-compaction-tool-result-pruner'
@@ -88,7 +87,7 @@ class MinimalImageAdapter extends LlmAdapter {
     const first = this.requests.length === 1
     yield { type: 'block-start', index: 0, blockType: first ? 'tool-call' : 'text' }
     yield { type: 'block-end', index: 0, block: first
-      ? { type: 'tool-call', id: brandString<ToolCallId>('minimal-image-read'), name: 'read_image', arguments: '{"file_path":"red.png"}' }
+      ? { type: 'tool-call', id: ToolCallId('minimal-image-read'), name: 'read_image', arguments: '{"file_path":"red.png"}' }
       : { type: 'text', text: 'Image inspected.' } }
     yield { type: 'finish', reason: { kind: first ? 'tool-calls' : 'stop' } }
   }
@@ -269,7 +268,7 @@ describe('the shipped Web composition', () => {
     const projections = ctx.get('sessionProjections')
     if (projections === undefined) throw new Error('the Web composition must compose a projection registry')
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-minimal-meter'),
+      sessionId: SessionId('preset-minimal-meter'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
     try {
@@ -292,7 +291,7 @@ describe('the shipped Web composition', () => {
 
   it.each(['standard', 'cordis', 'ptc'] as const)('keeps interruption disabled in %s with Team mode off or on', async (preset) => {
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>(`preset-interrupt-${preset}`),
+      sessionId: SessionId(`preset-interrupt-${preset}`),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, preset).then(() => undefined),
     })
     try {
@@ -327,7 +326,7 @@ describe('the shipped Web composition', () => {
     }])
     try {
       const handle = await configured.agents.create({
-        sessionId: brandString<SessionId>(`preset-interrupt-enabled-${preset}`),
+        sessionId: SessionId(`preset-interrupt-enabled-${preset}`),
         setup: agentCtx => configured.agentPresets.mount(agentCtx, preset).then(() => undefined),
       })
       try {
@@ -341,7 +340,7 @@ describe('the shipped Web composition', () => {
 
   it('composes the full agent from `standard`', async () => {
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-standard'),
+      sessionId: SessionId('preset-standard'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     try {
@@ -370,7 +369,7 @@ describe('the shipped Web composition', () => {
       allowedModels: [],
     })
     const disabled = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-model-selection-disabled'),
+      sessionId: SessionId('preset-model-selection-disabled'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     await ctx.settings.update(SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE, {
@@ -378,7 +377,7 @@ describe('the shipped Web composition', () => {
       allowedModels: [{ provider: 'deepseek-official', model: 'deepseek-v4-flash' }],
     })
     const enabled = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-model-selection-enabled'),
+      sessionId: SessionId('preset-model-selection-enabled'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     const policy = await ctx.sessionProjections.register(subagentModelSelectionProjectionDefinition)
@@ -411,13 +410,13 @@ describe('the shipped Web composition', () => {
     const unregister = ctx.llm.registerAdapter(['preset-round-trip'], adapter)
     onTestFinished(unregister)
     const direct = await ctx.agents.create({
-      sessionId: brandString<SessionId>(`preset-direct-${target}-${randomUUID()}`),
+      sessionId: SessionId(`preset-direct-${target}-${randomUUID()}`),
       agentOptions: { provider: 'preset-round-trip', model: 'preset-round-trip' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, target).then(() => undefined),
     })
     onTestFinished(() => direct.dispose())
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>(`preset-round-trip-${target}-${randomUUID()}`),
+      sessionId: SessionId(`preset-round-trip-${target}-${randomUUID()}`),
       agentOptions: { provider: 'preset-round-trip', model: 'preset-round-trip' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, target).then(() => undefined),
     })
@@ -451,7 +450,7 @@ describe('the shipped Web composition', () => {
 
   it('composes the exact RL prompt and persistent shell from `minimal`', async () => {
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-minimal'),
+      sessionId: SessionId('preset-minimal'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
     try {
@@ -485,7 +484,7 @@ describe('the shipped Web composition', () => {
     const unregister = ctx.llm.registerAdapter(['minimal-image-test'], adapter)
     onTestFinished(unregister)
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-minimal-image'), meta: { cwd },
+      sessionId: SessionId('preset-minimal-image'), meta: { cwd },
       agentOptions: { provider: 'minimal-image-test', model: 'minimal-image-test' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
@@ -513,7 +512,7 @@ describe('the shipped Web composition', () => {
     const unregister = ctx.llm.registerAdapter(['minimal-compaction-test'], adapter)
     onTestFinished(unregister)
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-minimal-compaction'),
+      sessionId: SessionId('preset-minimal-compaction'),
       agentOptions: { provider: 'minimal-compaction-test', model: 'minimal-compaction-test' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
@@ -547,7 +546,7 @@ describe('the shipped Web composition', () => {
     const unregister = ctx.llm.registerAdapter(['minimal-pressure-test'], adapter)
     onTestFinished(unregister)
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-minimal-pressure'),
+      sessionId: SessionId('preset-minimal-pressure'),
       agentOptions: { provider: 'minimal-pressure-test', model: 'minimal-pressure-test' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
@@ -572,11 +571,11 @@ describe('the shipped Web composition', () => {
 
   it('keeps two differently composed sessions independent', async () => {
     const full = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-both-full'),
+      sessionId: SessionId('preset-both-full'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     const minimal = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-both-minimal'),
+      sessionId: SessionId('preset-both-minimal'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
     try {
@@ -597,7 +596,7 @@ describe('the shipped Web composition', () => {
 
   it('composes the cordis agent with its own toolset', async () => {
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-cordis'),
+      sessionId: SessionId('preset-cordis'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'cordis').then(() => undefined),
     })
     try {
@@ -620,7 +619,7 @@ describe('the shipped Web composition', () => {
       expect(shipped).toEqual(['dsh-doc'])
       expect((await ctx.skills.list()).map(skill => skill.name)).not.toContain('dsh-doc')
       const loaded = await executeToolFixture(ctx, {
-        callId: brandString<ToolCallId>('preset-cordis-dsh-doc'),
+        callId: ToolCallId('preset-cordis-dsh-doc'),
         name: 'skill',
         arguments: { name: 'dsh-doc' },
         signal: new AbortController().signal,
@@ -637,7 +636,7 @@ describe('the shipped Web composition', () => {
       for (const file of readdirSync(references).filter(entry => entry !== 'packages.md')) {
         const path = join(references, file)
         const result = await executeToolFixture(ctx, {
-          callId: brandString<ToolCallId>(`preset-cordis-dsh-doc-${file}`),
+          callId: ToolCallId(`preset-cordis-dsh-doc-${file}`),
           name: 'read',
           arguments: { file_path: path },
           signal: new AbortController().signal,
@@ -651,7 +650,7 @@ describe('the shipped Web composition', () => {
 
       // Creator adds its DSH customization intent to the shared coding persona.
       const standard = await ctx.agents.create({
-        sessionId: brandString<SessionId>('preset-cordis-standard-persona'),
+        sessionId: SessionId('preset-cordis-standard-persona'),
         setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
       })
       try {
@@ -675,7 +674,7 @@ describe('the shipped Web composition', () => {
         })
         try {
           const codingOnly = await ctx.agents.create({
-            sessionId: brandString<SessionId>('preset-cordis-coding-only'),
+            sessionId: SessionId('preset-cordis-coding-only'),
             setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'cordis-coding-only').then(() => undefined),
           })
           try {
@@ -693,11 +692,11 @@ describe('the shipped Web composition', () => {
 
   it('presents `ptc` as PTC mode without disturbing a native session beside it', async () => {
     const coded = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-ptc'),
+      sessionId: SessionId('preset-ptc'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'ptc').then(() => undefined),
     })
     const native = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-ptc-native'),
+      sessionId: SessionId('preset-ptc-native'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     try {
@@ -726,7 +725,7 @@ describe('the shipped Web composition', () => {
 
   it('keeps the self-referential toolset out of every other preset', async () => {
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-no-cordis'),
+      sessionId: SessionId('preset-no-cordis'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     try {
@@ -759,7 +758,7 @@ describe('the shipped Web composition', () => {
     const handle = await ctx.agents.create({
       // Unique per run: the composition persists into the ambient DSH home,
       // and a fixed id would collide with a log an earlier run left there.
-      sessionId: brandString<SessionId>(`preset-skills-standard-${randomUUID()}`),
+      sessionId: SessionId(`preset-skills-standard-${randomUUID()}`),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     try {
@@ -777,7 +776,7 @@ describe('the shipped Web composition', () => {
 
       // The preset's own loader tool resolves the global-layer skill.
       const loaded = await executeToolFixture(ctx, {
-        callId: brandString<ToolCallId>('preset-skills-load'),
+        callId: ToolCallId('preset-skills-load'),
         name: 'skill',
         arguments: { name: 'dsh-badge' },
         signal: new AbortController().signal,
@@ -792,7 +791,7 @@ describe('the shipped Web composition', () => {
 
   it('shows a minimal agent the global layer but no loader tool', async () => {
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>(`preset-skills-minimal-${randomUUID()}`),
+      sessionId: SessionId(`preset-skills-minimal-${randomUUID()}`),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
     try {
@@ -814,7 +813,7 @@ describe('the shipped Web composition', () => {
     const before = await Promise.all(WEB_PATCHES.map(file => readFile(file, 'utf8')))
 
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-readonly'),
+      sessionId: SessionId('preset-readonly'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     await handle.dispose()
@@ -839,7 +838,7 @@ describe('preset-selected delegation through the Web Loader', () => {
         const adapter = new MinimalCompactionAdapter()
         configured.llm.registerAdapter(['preset-switch'], adapter)
         const { agent } = await configured.agents.create({
-          sessionId: brandString<SessionId>(`configured-switch-${randomUUID()}`),
+          sessionId: SessionId(`configured-switch-${randomUUID()}`),
           agentOptions: { provider: 'preset-switch', model: 'preset-switch' },
           setup: owner => configured.agentPresets.mount(owner, 'delegate-a').then(() => undefined),
         })
@@ -880,7 +879,7 @@ describe.each(['web', 'desktop'] as const)('%s native subagent bundles', (surfac
 
   async function presetTools(productCtx: Context, preset: string): Promise<string[]> {
     const handle = await productCtx.agents.create({
-      sessionId: brandString<SessionId>(`native-${surface}-${preset}-${randomUUID()}`),
+      sessionId: SessionId(`native-${surface}-${preset}-${randomUUID()}`),
       setup: owner => productCtx.agentPresets.mount(owner, preset).then(() => undefined),
     })
     try {
@@ -900,7 +899,7 @@ describe.each(['web', 'desktop'] as const)('%s native subagent bundles', (surfac
           expect(await presetTools(productCtx, preset)).toEqual(expected)
         }
         const handle = await productCtx.agents.create({
-          sessionId: brandString<SessionId>(`native-${surface}-params-${randomUUID()}`),
+          sessionId: SessionId(`native-${surface}-params-${randomUUID()}`),
           setup: owner => productCtx.agentPresets.mount(owner, 'standard').then(() => undefined),
         })
         try {
@@ -962,12 +961,12 @@ describe('the standard preset documentation skill', () => {
       const adapter = new MinimalCompactionAdapter()
       testCtx.llm.registerAdapter(['standard-doc-test'], adapter)
       const baseline = await testCtx.agents.create({
-        sessionId: brandString<SessionId>('standard-doc-baseline'), meta: { cwd: root },
+        sessionId: SessionId('standard-doc-baseline'), meta: { cwd: root },
         agentOptions: { provider: 'standard-doc-test', model: 'standard-doc-test' },
         setup: agentCtx => testCtx.agentPresets.mount(agentCtx, 'standard-without-doc').then(() => undefined),
       })
       const standardAgent = await testCtx.agents.create({
-        sessionId: brandString<SessionId>('standard-doc-current'), meta: { cwd: root },
+        sessionId: SessionId('standard-doc-current'), meta: { cwd: root },
         agentOptions: { provider: 'standard-doc-test', model: 'standard-doc-test' },
         setup: agentCtx => testCtx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
       })
@@ -979,7 +978,7 @@ describe('the standard preset documentation skill', () => {
       expect(definition?.path).toBe(await realpath(join(REPO_ROOT, 'packages/preset/agent-preset/skills/dsh-doc/SKILL.md')))
       if (definition === undefined) throw new Error('standard has no packaged dsh-doc skill')
       const creator = await testCtx.agents.create({
-        sessionId: brandString<SessionId>('standard-doc-creator'), meta: { cwd: root },
+        sessionId: SessionId('standard-doc-creator'), meta: { cwd: root },
         setup: agentCtx => testCtx.agentPresets.mount(agentCtx, 'cordis').then(() => undefined),
       })
       expect((await testCtx.skills.get('dsh-doc', { cwd: root, scope: creator.agent }))?.path).toBe(definition.path)
@@ -1024,7 +1023,7 @@ describe('the standard preset documentation skill', () => {
       const profileManifest = join(root, 'profiles/spec/package.json')
       const before = await readFile(profileManifest, 'utf8')
       const loaded = await executeToolFixture(testCtx, {
-        agent: standardAgent.agent, callId: brandString<ToolCallId>('standard-doc-load'),
+        agent: standardAgent.agent, callId: ToolCallId('standard-doc-load'),
         name: 'skill', arguments: { name: 'dsh-doc' }, signal: new AbortController().signal,
       })
       expect(loaded.isError).toBe(false)
@@ -1066,7 +1065,7 @@ describe('the standard preset documentation skill', () => {
       priorityCtx = await bootWeb(root)
       const testCtx = priorityCtx
       const handle = await testCtx.agents.create({
-        sessionId: brandString<SessionId>('standard-doc-priority'), meta: { cwd: workspace },
+        sessionId: SessionId('standard-doc-priority'), meta: { cwd: workspace },
         setup: agentCtx => testCtx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
       })
       for (const [cwd, path] of [
@@ -1106,11 +1105,11 @@ describe('a user preset declared from the shipped cordis rows', () => {
     }] }])
     try {
       const shipped = await copyCtx.agents.create({
-        sessionId: brandString<SessionId>(`preset-cordis-shipped-${randomUUID()}`),
+        sessionId: SessionId(`preset-cordis-shipped-${randomUUID()}`),
         setup: agentCtx => copyCtx.agentPresets.mount(agentCtx, 'cordis').then(() => undefined),
       })
       const copied = await copyCtx.agents.create({
-        sessionId: brandString<SessionId>(`preset-cordis-copy-${randomUUID()}`),
+        sessionId: SessionId(`preset-cordis-copy-${randomUUID()}`),
         setup: agentCtx => copyCtx.agentPresets.mount(agentCtx, 'cordis-copy').then(() => undefined),
       })
       try {
@@ -1121,7 +1120,7 @@ describe('a user preset declared from the shipped cordis rows', () => {
         }
         const signal = new AbortController().signal
         const listed = await executeToolFixture(copyCtx, {
-          callId: brandString<ToolCallId>('copied-preset-inspect-list'),
+          callId: ToolCallId('copied-preset-inspect-list'),
           name: 'cordis_inspect_list',
           arguments: {},
           signal,
@@ -1138,7 +1137,7 @@ describe('a user preset declared from the shipped cordis rows', () => {
         const spills = vi.spyOn(copyCtx.spillStore, 'saveText')
         onTestFinished(() => { spills.mockRestore() })
         const queried = await executeToolFixture(copyCtx, {
-          callId: brandString<ToolCallId>('copied-preset-inspect-tools'),
+          callId: ToolCallId('copied-preset-inspect-tools'),
           name: 'cordis_inspect_query',
           arguments: { platform: 'host', provider: 'Tool', method: 'listTools' },
           signal,
@@ -1157,7 +1156,7 @@ describe('a user preset declared from the shipped cordis rows', () => {
         type ConfigPage = { data: { entries: ConfigRow[]; total: number; nextOffset: number | null } }
         const listConfigs = async (input: Record<string, string | number>, callId: string): Promise<ConfigPage['data']> => {
           const page = await executeToolFixture(copyCtx, {
-            callId: brandString<ToolCallId>(callId),
+            callId: ToolCallId(callId),
             name: 'cordis_inspect_query',
             arguments: { platform: 'host', provider: 'Config', method: 'listConfigs', input },
             signal,
@@ -1176,7 +1175,7 @@ describe('a user preset declared from the shipped cordis rows', () => {
         expect(firstPage.entries).toHaveLength(5)
         expect(firstPage.nextOffset).toBe(5)
         const projected = await executeToolFixture(copyCtx, {
-          callId: brandString<ToolCallId>('copied-preset-inspect-config'),
+          callId: ToolCallId('copied-preset-inspect-config'),
           name: 'cordis_inspect_query',
           arguments: { platform: 'host', provider: 'Config', method: 'listConfigs', input: { entry: toolsRow!.id } },
           signal,
@@ -1202,7 +1201,7 @@ describe('a user preset declared from the shipped cordis rows', () => {
 describe('a switch survives the session', () => {
   it('records the choice so the log states what the agent runs', async () => {
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-switch-logged'),
+      sessionId: SessionId('preset-switch-logged'),
       meta: { agentPreset: 'standard' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
@@ -1226,18 +1225,18 @@ describe('a switch survives the session', () => {
 describe('a forked session', () => {
   it('inherits the composition its seeded history was produced under', async () => {
     const parent = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-fork-parent'),
+      sessionId: SessionId('preset-fork-parent'),
       meta: { agentPreset: 'minimal' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
     const projection = await ctx.sessionProjections.register(agentPresetProjectionDefinition)
     const inherited = projection.stateOf(parent.agent.session) ?? undefined
     const child = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-fork-child'),
+      sessionId: SessionId('preset-fork-child'),
       seed: [],
       inheritedEventCount: SessionLogOffset(0),
       meta: {
-        parentSession: brandString<SessionId>('preset-fork-parent'),
+        parentSession: SessionId('preset-fork-parent'),
         isSeeded: true,
         ...inherited === undefined ? {} : { agentPreset: inherited },
       },
@@ -1259,13 +1258,13 @@ describe('a forked session', () => {
 describe('a delegated child', () => {
   it.each([false, true])('inherits preset tools with seeded=%s and refuses child scheduled tasks', async (seeded) => {
     const parent = await ctx.agents.create({
-      sessionId: brandString<SessionId>(`preset-child-parent-${seeded}`),
+      sessionId: SessionId(`preset-child-parent-${seeded}`),
       meta: { agentPreset: 'standard' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     // Exactly what an in-process subagent driver's creation window does.
     const child = await parent.agent.ctx.agents.create({
-      sessionId: brandString<SessionId>(`preset-child-${seeded}`),
+      sessionId: SessionId(`preset-child-${seeded}`),
       meta: childSessionMeta(parent.agent, 1, seeded),
       ...(seeded ? { seed: [], inheritedEventCount: SessionLogOffset(0) } : {}),
       setup: (agentCtx) => {
@@ -1289,7 +1288,7 @@ describe('a delegated child', () => {
       for (const [name, args] of calls) {
         expect(toolNames(ctx, child.agent)).toContain(name)
         const result = await executeToolFixture(ctx, {
-          callId: brandString<ToolCallId>(`child-${name}`), signal: new AbortController().signal,
+          callId: ToolCallId(`child-${name}`), signal: new AbortController().signal,
           name, arguments: args, agent: child.agent,
         })
         expect(result.value).toEqual({ code: 'subagent_session', message: 'A delegated subagent cannot use scheduled tasks.' })
@@ -1303,13 +1302,13 @@ describe('a delegated child', () => {
 
   it('follows a parent that switched preset while blank', async () => {
     const parent = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-child-switch-parent'),
+      sessionId: SessionId('preset-child-switch-parent'),
       meta: { agentPreset: 'standard' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     await ctx.agentPresets.recompose(parent.agent.ctx, 'minimal')
     const child = await parent.agent.ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-child-switch'),
+      sessionId: SessionId('preset-child-switch'),
       meta: childSessionMeta(parent.agent, 1, false),
       setup: (agentCtx) => {
         return applyChildComposition(agentCtx, parent.agent, {})
@@ -1336,7 +1335,7 @@ describe('the default preset as a user setting', () => {
       expect(ctx.agentPresets.defaultId).toBe('minimal')
 
       const handle = await ctx.agents.create({
-        sessionId: brandString<SessionId>('preset-user-default'),
+        sessionId: SessionId('preset-user-default'),
         setup: agentCtx => ctx.agentPresets.mount(agentCtx).then(() => undefined),
       })
       try {
@@ -1383,7 +1382,7 @@ describe('a profile patch stored before Developer tools owned preset selection',
       .toEqual({ selectedDefault: 'minimal' })
 
     const handle = await legacy.agents.create({
-      sessionId: brandString<SessionId>('preset-legacy-patch'),
+      sessionId: SessionId('preset-legacy-patch'),
       setup: agentCtx => legacy.agentPresets.mount(agentCtx).then(() => undefined),
     })
     try {
@@ -1397,7 +1396,7 @@ describe('a profile patch stored before Developer tools owned preset selection',
 describe('a session keeps the preset it was created with', () => {
   it('refuses to adopt a live session under a different preset', async () => {
     const handle = await ctx.agents.create({
-      sessionId: brandString<SessionId>('preset-locked'),
+      sessionId: SessionId('preset-locked'),
       meta: { agentPreset: 'minimal' },
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })

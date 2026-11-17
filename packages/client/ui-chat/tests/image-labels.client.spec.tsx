@@ -2,9 +2,8 @@
 
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import type { AttachmentId } from '@deepseek-ai/dsh-attachment/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { makeTranslate, SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { MessageImagesOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -19,7 +18,7 @@ afterEach(cleanup)
 const t = makeTranslate(zh, commonZh)
 
 const attachment = {
-  attachmentId: brandString<AttachmentId>(`sha256:${'a'.repeat(64)}`),
+  attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
   mediaType: 'image/png' as const,
   bytes: 68,
   width: 640,
@@ -44,7 +43,7 @@ async function renderImages(blocks: AssistantMarkdownProps['blocks'], calls: Mes
     )
   }))
   await runtime.sessions.add({ id: 'image-labels' })
-  const session = runtime.sessions.retainFor(runtime.ctx, brandString<SessionId>('image-labels'))
+  const session = runtime.sessions.retainFor(runtime.ctx, SessionId('image-labels'))
   await runtime.root.declare({
     'conversation.chat.reasoning.body': { kind: 'single', scope: 'session' },
     'conversation.chat.message.images': { kind: 'single', scope: 'session' },

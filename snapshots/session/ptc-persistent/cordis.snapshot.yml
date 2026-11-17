@@ -56,4 +56,3 @@
 - id: ptc-runtime
   config:
     executionMode: persistent-in-memory
-    replScoped: false

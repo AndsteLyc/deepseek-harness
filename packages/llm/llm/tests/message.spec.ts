@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import {
-  type ToolCallId,
+  ToolCallId,
   boundContextSummary,
   CONTEXT_SUMMARY_MAX_CHARS,
   createAssistantMessage,
@@ -10,7 +9,7 @@ import {
   createToolResultMessage,
   createUserMessage,
   freezeMessage,
-  type MessageId,
+  MessageId,
 } from '@deepseek-ai/dsh-llm'
 
 describe('message construction', () => {
@@ -67,7 +66,7 @@ describe('message construction', () => {
   })
 
   it('freezes an existing identity without minting a replacement', () => {
-    const id = brandString<MessageId>('existing')
+    const id = MessageId('existing')
     const input = {
       id,
       role: 'assistant' as const,
@@ -108,7 +107,7 @@ describe('message construction', () => {
   })
 
   it('couples tool-result content and its cited call seq to one call identity', () => {
-    const callId = brandString<ToolCallId>('call-1')
+    const callId = ToolCallId('call-1')
     const message = createToolResultMessage({
       callId,
       content: [{ type: 'text', text: 'result' }],

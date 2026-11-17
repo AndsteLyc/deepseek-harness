@@ -4,11 +4,10 @@ import { runInNewContext } from 'node:vm'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { SessionId } from '@deepseek-ai/dsh-session'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { SessionId } from '@deepseek-ai/dsh-session'
 
 function agent(id: string): Agent {
-  return { id: brandString<SessionId>(id) } as Agent
+  return { id: SessionId(id) } as Agent
 }
 
 async function harness(): Promise<{

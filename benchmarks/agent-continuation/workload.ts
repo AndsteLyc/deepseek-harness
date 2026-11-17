@@ -1,10 +1,9 @@
 /** Reviewed synthetic tool history shared by continuation and child-catalog measurements. */
 
 import { AssistantStreamAccumulator } from '@deepseek-ai/dsh-llm/assistant-stream'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { MessageId, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { Session, type SessionId } from '@deepseek-ai/dsh-session'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 
 /** Workload dimensions, independent of environment and recorded user material. */
@@ -23,7 +22,7 @@ export const WORKLOAD = {
 /** Fixed clock used only to author persisted synthetic input. */
 export const TIME_ZERO = 1_700_000_000_000
 /** Durable parent identity of the measured continuation. */
-export const PARENT_ID = brandString<SessionId>('bench-parent')
+export const PARENT_ID = SessionId('bench-parent')
 
 /**
  * Construct a deterministic model reply without retaining past requests.
@@ -36,7 +35,7 @@ export function response(serial: number, tools: number): { chunks: StreamChunk[]
     { type: 'reasoning', text: 'Inspect the synthetic result. '.repeat(8) },
     { type: 'text', text: 'Synthetic response. '.repeat(8) },
     ...Array.from({ length: tools }, (_, index): ContentBlock => ({
-      type: 'tool-call', id: brandString<ToolCallId>('call-' + String(serial) + '-' + String(index)), name: 'bench_tool',
+      type: 'tool-call', id: ToolCallId('call-' + String(serial) + '-' + String(index)), name: 'bench_tool',
       arguments: JSON.stringify({ ordinal: serial * 100 + index }),
     })),
   ]
@@ -70,10 +69,10 @@ export function syntheticHistory(turns: number): SessionEvent[] {
     session.append('turn/start', { turn })
     session.append('step/start', { turn, step: 1 })
     if (turn === 1) session.append('system/message', {
-      turn, step: 1, message: { id: brandString<MessageId>('system-head'), role: 'system', content: [], source: { kind: 'system-prompt' } },
+      turn, step: 1, message: { id: MessageId('system-head'), role: 'system', content: [], source: { kind: 'system-prompt' } },
     }, { surfaceOp: 'append' })
     session.append('user/message', {
-      id: brandString<MessageId>('prompt-' + String(turn)), role: 'user',
+      id: MessageId('prompt-' + String(turn)), role: 'user',
       content: [{ type: 'text', text: 'Inspect synthetic module ' + String(turn) }], source: { kind: 'user' },
     }, { surfaceOp: 'append' })
     for (const step of [1, 2]) {
@@ -83,7 +82,7 @@ export function syntheticHistory(turns: number): SessionEvent[] {
       reply.chunks.forEach((chunk, index) => { stream.push({ time: TIME_ZERO + turn * 1_000 + step * 100 + index, chunk }) })
       session.append('assistant/message', {
         turn, step,
-        message: { id: brandString<MessageId>('reply-' + String(turn) + '-' + String(step)), role: 'assistant', content: reply.content, source: { kind: 'model', provider: 'bench', model: 'bench' } },
+        message: { id: MessageId('reply-' + String(turn) + '-' + String(step)), role: 'assistant', content: reply.content, source: { kind: 'model', provider: 'bench', model: 'bench' } },
         stream: [...stream.snapshot()],
       }, { surfaceOp: 'append' })
       for (const block of reply.content) {
@@ -92,7 +91,7 @@ export function syntheticHistory(turns: number): SessionEvent[] {
         session.append('tool/result', {
           turn, step,
           message: {
-            id: brandString<MessageId>('result-' + block.id), role: 'tool', toolCallId: block.id, isError: false,
+            id: MessageId('result-' + block.id), role: 'tool', toolCallId: block.id, isError: false,
             source: { kind: 'tool', callId: block.id },
             content: [{ type: 'text', text: resultText(turn) }],
           },

@@ -50,13 +50,11 @@ struct NativeFailure: Error, Sendable {
     let code: String
     let message: String
     let accessibilityError: Int32?
-    let attribute: String?
 
-    init(code: String, message: String, accessibilityError: Int32? = nil, attribute: String? = nil) {
+    init(code: String, message: String, accessibilityError: Int32? = nil) {
         self.code = code
         self.message = message
         self.accessibilityError = accessibilityError
-        self.attribute = attribute
     }
 }
 
@@ -149,7 +147,7 @@ struct WindowInfo: Sendable {
 
     var json: JSONValue {
         var record: [String: JSONValue] = [
-            "windowId": .string(String(windowID)),
+            "windowId": .number(Double(windowID)),
             "appName": .string(appName), "title": .string(title), "bounds": bounds.json,
             "isOnScreen": .bool(isOnScreen), "onCurrentSpace": onCurrentSpace.map(JSONValue.bool) ?? .null,
         ]

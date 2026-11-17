@@ -74,7 +74,6 @@ private func wrappedAXError(_ code: AXError) throws -> AXValue {
             Issue.record("Batch attribute accepted an accessibility failure")
         } catch let error as NativeFailure {
             #expect(error.code == (code == .apiDisabled ? "PERMISSION_DENIED" : "NATIVE_ERROR"))
-            #expect(error.attribute == "AXTitle")
             #expect(error.accessibilityError == code.rawValue)
             #expect(error.message.contains("AXTitle"))
             #expect(error.message.contains(String(code.rawValue)))
@@ -82,29 +81,21 @@ private func wrappedAXError(_ code: AXError) throws -> AXValue {
     }
 }
 
-@Test func observationFailuresPreserveNativeDetailsWithoutReclassifyingInputOrStaleSnapshots() {
+@Test func invalidElementsInvalidateObservationsWithoutWeakeningInputOrOtherErrors() {
     let access = AXAccess(timeout: 1, cancellation: CancellationLatch())
-    for (error, attribute) in [(AXError.invalidUIElement, "AXRole"), (.cannotComplete, "AXChildren")] {
-        let original = access.failure(error, "read \(attribute)", attribute: attribute)
-        #expect(original.code == "NATIVE_ERROR")
-        let observed = AXWorker.observationFailure(original)
-        #expect(observed.code == "AX_OBSERVATION_UNAVAILABLE")
-        #expect(observed.message.contains("read \(attribute) failed with error \(error.rawValue)"))
-        #expect(observed.accessibilityError == error.rawValue)
-        #expect(observed.attribute == attribute)
-    }
-    for code in [AXError.apiDisabled, .failure, .illegalArgument] {
+    let stale = access.failure(.invalidUIElement, "read AXRole")
+    #expect(stale.code == "NATIVE_ERROR")
+    #expect(AXWorker.observationFailure(stale).code == "STALE_SNAPSHOT")
+    for code in [AXError.apiDisabled, .cannotComplete, .failure, .illegalArgument] {
         let original = access.failure(code, "read AXRole")
         let observed = AXWorker.observationFailure(original)
         #expect(observed.code == original.code)
         #expect(observed.message == original.message)
         #expect(observed.accessibilityError == code.rawValue)
     }
-    for other in [NativeFailure(code: "NATIVE_ERROR", message: "Unrelated failure with -25202 in text"),
-                  NativeFailure(code: "STALE_SNAPSHOT", message: "Snapshot expired; read fresh getAccessibilityTree")] {
-        #expect(AXWorker.observationFailure(other).code == other.code)
-        #expect(AXWorker.observationFailure(other).message == other.message)
-    }
+    let other = NativeFailure(code: "NATIVE_ERROR", message: "Unrelated failure with -25202 in text")
+    #expect(AXWorker.observationFailure(other).code == other.code)
+    #expect(AXWorker.observationFailure(other).message == other.message)
 }
 
 @Test func batchRejectsSuccessEncodedAsAnAttributeError() throws {
@@ -184,7 +175,7 @@ func consumedContainerMetadataPreservesStaleAndCommunicationErrors(role: String)
             } catch let error as NativeFailure {
                 #expect(error.accessibilityError == code.rawValue)
                 #expect(error.code == (code == .apiDisabled ? "PERMISSION_DENIED" : "NATIVE_ERROR"))
-                if code == .invalidUIElement { #expect(AXWorker.observationFailure(error).code == "AX_OBSERVATION_UNAVAILABLE") }
+                if code == .invalidUIElement { #expect(AXWorker.observationFailure(error).code == "STALE_SNAPSHOT") }
             }
         }
     }

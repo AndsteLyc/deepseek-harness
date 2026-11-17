@@ -12,8 +12,6 @@
     "src/git.ts",
     "src/local-diff.ts",
     "src/layers.ts",
-    "src/lens-version.ts",
-    "src/lenses.ts",
     "src/panel.ts",
     "src/parse.ts",
     "src/patch-cache.ts",
@@ -68,9 +66,6 @@
     },
     {
       "path": "../../typert/protocol"
-    },
-    {
-      "path": "../../util/brand"
     },
     {
       "path": "../../util/timeout"

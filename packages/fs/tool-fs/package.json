@@ -32,7 +32,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@deepseek-ai/dsh-brand": "workspace:*",
     "diff": "^9.0.0",
     "@deepseek-ai/schemastery": "workspace:~",
     "@deepseek-ai/dsh-util-code-language": "workspace:*",

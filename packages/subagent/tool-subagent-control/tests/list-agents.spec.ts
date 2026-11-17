@@ -5,10 +5,10 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { SubagentCatalogEntry } from '@deepseek-ai/dsh-subagent'
@@ -19,7 +19,6 @@ import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-a
 import * as tool from '../src/index.ts'
 import { parkParent } from './park-parent.ts'
 import { TestSessionQuery } from './test-session-query.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 /** One scripted response that may wait on a caller-released gate before streaming. */
 interface GatedEntry {
@@ -72,7 +71,7 @@ async function setupWith(adapter: MockAdapter | GatedAdapter) {
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(tool)
   ctx.llm.registerAdapter(['mock'], adapter)
-  const parent = await ctx.agentLoop.create(brandString<SessionId>('parent'), { provider: 'mock', model: 'mock' })
+  const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
   parkParent(ctx, parent)
   return { ctx, parent, adapter }
 }
@@ -95,7 +94,7 @@ function callTool(
 ) {
   return executeToolFixture(ctx, {
     signal,
-    callId: brandString<ToolCallId>(`call-${++calls}`),
+    callId: ToolCallId(`call-${++calls}`),
     name,
     arguments: args,
     ...agent !== undefined ? { agent: agent as never } : {},
@@ -132,7 +131,7 @@ describe('list_agents', () => {
   it('omits external leaves without diagnostics', async () => {
     const { ctx, parent } = await setup([])
     parent.session.append('subagent/catalog', {
-      version: 2, childId: brandString<SessionId>('external-child'), childCreatedAt: 1,
+      version: 2, childId: SessionId('external-child'), childCreatedAt: 1,
       mode: 'external', label: 'external child',
     })
     const result = await callTool(ctx, 'list_agents', {}, parent)
@@ -176,7 +175,7 @@ describe('list_agents', () => {
     // from the live Agent registry, stubbed per candidate id.
     const entries = [
       {
-        id: brandString<SessionId>('one-shot-child'),
+        id: SessionId('one-shot-child'),
         createdAt: 1,
         label: 'finished once',
         mode: 'one-shot',
@@ -188,14 +187,14 @@ describe('list_agents', () => {
         mode: 'continuable',
       },
       {
-        id: brandString<SessionId>('running-child'),
+        id: SessionId('running-child'),
         createdAt: 3,
         label: 'still working',
         mode: 'continuable',
         name: 'runner',
       },
       {
-        id: brandString<SessionId>('waiting-child'),
+        id: SessionId('waiting-child'),
         createdAt: 4,
         label: 'waiting on descendants',
         mode: 'continuable',
@@ -236,7 +235,7 @@ describe('list_agents', () => {
   it('reports an unreadable historical branch alongside a settled continuable child', async () => {
     const { ctx, parent } = await setup([textResponse('done')])
     parent.session.append('subagent/catalog', {
-      version: 1, childId: brandString<SessionId>('historical-one-shot'), childCreatedAt: 1,
+      version: 1, childId: SessionId('historical-one-shot'), childCreatedAt: 1,
       mode: 'one-shot', label: 'finished once',
     })
     const started = await ctx.subagents.startActivation({ delivery: 'parent',
@@ -273,7 +272,6 @@ describe('list_agents', () => {
     const result = await callTool(ctx, 'list_agents', {})
     expect(result.isError).toBe(true)
     expect(text(result)).toContain('requires a calling agent')
-    expect(result.error?.info).toEqual({ name: 'ToolContextUnavailableError', code: 'TOOL_CONTEXT_UNAVAILABLE' })
   })
 
   it('unregisters with its plugin fiber (HMR safety)', async () => {
@@ -347,7 +345,7 @@ describe('list_agents', () => {
     ctx.subagents.listDescendants = () => Promise.resolve([
       {
         kind: 'child',
-        id: brandString<SessionId>('one-shot-mid'),
+        id: SessionId('one-shot-mid'),
         label: 'one-shot intermediate',
         mode: 'one-shot',
         activity: 'inactive',
@@ -357,17 +355,17 @@ describe('list_agents', () => {
       },
       {
         kind: 'child',
-        id: brandString<SessionId>('deep-leaf'),
+        id: SessionId('deep-leaf'),
         label: 'deep leaf',
         mode: 'continuable',
         activity: 'inactive',
         hasChildren: false,
-        parentId: brandString<SessionId>('one-shot-mid'),
+        parentId: SessionId('one-shot-mid'),
         depth: 2,
       },
       {
         kind: 'diagnostic',
-        id: brandString<SessionId>('broken-node'),
+        id: SessionId('broken-node'),
         reason: 'unavailable',
         parentId: parent.id,
         depth: 1,

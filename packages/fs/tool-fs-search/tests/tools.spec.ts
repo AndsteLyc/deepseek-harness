@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
 import { join, sep } from 'node:path'
-import { createUserMessage, type ToolCallId } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH, type ToolExecution, type ToolExecutionToken } from '@deepseek-ai/dsh-tools'
@@ -25,10 +25,9 @@ import { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type { SubprocessCollectedOutputs, SubprocessHandle, SubprocessOutcome, SubprocessOutputRead, SubprocessOutputReader, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { rgPath } from '@vscode/ripgrep'
-import { type SpillLocator, SpillStore } from '@deepseek-ai/dsh-spill'
+import { SpillLocator, SpillStore } from '@deepseek-ai/dsh-spill'
 import type { SaveTextSpill, SpillRef } from '@deepseek-ai/dsh-spill'
 import * as ToolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import {
   buildGlobCommand,
   buildGrepCommand,
@@ -186,7 +185,7 @@ class FakeSpill extends SpillStore {
     if (this.failWith) return Promise.reject(this.failWith)
     this.saves.push(input)
     return Promise.resolve({
-      locator: brandString<SpillLocator>(`/spill/${input.suggestedName}`),
+      locator: SpillLocator(`/spill/${input.suggestedName}`),
       bytes: Buffer.byteLength(input.content, 'utf8'),
       retrievalHint: 'Use the fake retrieval hint.',
     })
@@ -228,7 +227,7 @@ function call(
 ) {
   return executeToolFixture(ctx, {
     signal: testToolSignal,
-    callId: brandString<ToolCallId>(`call-${++callCounter}`),
+    callId: ToolCallId(`call-${++callCounter}`),
     name,
     arguments: args,
     ...options.agent ? { agent: options.agent as never } : {},
@@ -489,11 +488,7 @@ describe('workdir derivation and signal forwarding', () => {
     const { ctx } = await setup()
     const controller = new AbortController()
     controller.abort()
-    const callId = brandString<ToolCallId>('direct-pre-abort')
-    const exec: ToolExecution = {
-      signal: controller.signal, name: 'glob', callId, rootCallId: callId,
-      arguments: {}, token: Symbol('direct-pre-abort') as ToolExecutionToken,
-    }
+    const exec = { signal: controller.signal, name: 'glob', callId: ToolCallId('direct-pre-abort') } as unknown as ToolExecution
     await expect(runRipgrep(ctx, exec, 'glob', ['--files'], 1_000_000, 3_000, 64 * 1024)).rejects
       .toMatchObject({ name: 'SearchError', code: 'SEARCH_ABORTED' })
   })

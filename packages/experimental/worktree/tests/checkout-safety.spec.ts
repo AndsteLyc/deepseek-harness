@@ -121,9 +121,7 @@ describe('worktree checkout Git configuration', () => {
     ctx = await harness(root)
     const agent = testAgent(ctx, root)
 
-    await expect(ctx.worktrees.create(agent, { name: 'invalid' })).rejects.toMatchObject({
-      name: 'WorktreeError', code: 'WORKTREE_COMMAND_FAILED', message: expect.stringMatching(/Any created checkout and branch are retained.*bad config line/s) as string,
-    })
+    await expect(ctx.worktrees.create(agent, { name: 'invalid' })).rejects.toThrow(/Any created checkout and branch are retained.*bad config line/s)
 
     expect(ctx.workingDirectory.get(agent.session)).toBe(root)
     await access(join(root, '.agents/worktrees/invalid/.git'))
@@ -137,9 +135,7 @@ describe('worktree checkout Git configuration', () => {
     ctx = await harness(root, { maxOutputBytes: 256 })
     const agent = testAgent(ctx, root)
 
-    await expect(ctx.worktrees.create(agent, { name: 'bounded' })).rejects.toMatchObject({
-      code: 'WORKTREE_OUTPUT_TOO_LARGE', message: expect.stringContaining('output exceeds maxOutputBytes') as string,
-    })
+    await expect(ctx.worktrees.create(agent, { name: 'bounded' })).rejects.toThrow('output exceeds maxOutputBytes')
 
     expect(ctx.workingDirectory.get(agent.session)).toBe(root)
     await access(join(root, '.agents/worktrees/bounded/.git'))

@@ -30,20 +30,18 @@ import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import type { Session, UserMessage } from '@deepseek-ai/dsh-session'
-import { defineTool, ToolArgsError, ToolContextUnavailableError } from '@deepseek-ai/dsh-tools'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import { UserQuestionError, type AskUserQuestionAnswer } from '@deepseek-ai/dsh-user-questions'
 import type { CommandDefinitionId, CommandId } from '@deepseek-ai/dsh-commands'
 import type {} from '@deepseek-ai/dsh-session-projection'
 import type { ProjectionDefinition, ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import type { PlanProjection, PlanUnitState } from './types.ts'
-import { PlanModeError } from './error.ts'
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
     'plan-mode': { kind: 'plan-mode' } & ContextFormed
   }
 }
 export type * from './types.ts'
-export { PlanModeError, type PlanModeErrorCode } from './error.ts'
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
@@ -303,20 +301,15 @@ export class PlanModeController extends Service {
       execute: async (args, exec) => {
         const agent = exec.agent
         // Admission outlives plan mode and follows the selected state, so check the committed state.
-        if (agent === undefined) {
-          throw new ToolContextUnavailableError(`${EXIT_PLAN_MODE} requires a calling agent`)
-        }
-        if (!this.loggedActive(agent.session)) {
-          throw new PlanModeError(`${EXIT_PLAN_MODE} is only available in plan mode`, 'PLAN_NOT_ACTIVE')
+        if (agent === undefined || !this.loggedActive(agent.session)) {
+          throw new Error(`${EXIT_PLAN_MODE} is only available in plan mode`)
         }
         if (!/^#\s+\S/.test(args.plan.trim())) {
-          throw new ToolArgsError([`${EXIT_PLAN_MODE} requires a non-empty markdown plan starting with a # heading`])
+          throw new Error(`${EXIT_PLAN_MODE} requires a non-empty markdown plan starting with a # heading`)
         }
         const interaction = ctx.get('userQuestions')
         if (interaction === undefined) {
-          throw new ToolContextUnavailableError(
-            'no user-questions channel is available to review the plan; ask the user to switch the session mode instead',
-          )
+          throw new Error('no user-questions channel is available to review the plan; ask the user to switch the session mode instead')
         }
         let answer: AskUserQuestionAnswer
         try {
@@ -352,18 +345,15 @@ export class PlanModeController extends Service {
         // A review may outlive this plugin fiber. Without its pre-step listener,
         // an approved selection could never be appended, so fail and keep planning.
         if (disposed) {
-          throw new PlanModeError(
-            'the plan-mode service was reloaded while the plan was under review; present the plan again',
-            'PLAN_REVIEW_INTERRUPTED',
-          )
+          throw new Error('the plan-mode service was reloaded while the plan was under review; present the plan again')
         }
         const reviewItems = answer.answers.filter(entry => entry.id === REVIEW_ID)
         const item = reviewItems.length === 1 ? reviewItems[0] : undefined
         if (item?.selected.length !== 1 || item.selected[0] !== APPROVE_LABEL || item.custom !== undefined) {
           const feedback = item?.custom ?? ''
-          throw new PlanModeError(feedback === ''
+          throw new Error(feedback === ''
             ? 'The user chose to keep planning; revise the plan and present it again.'
-            : `The user chose to keep planning; their feedback: ${feedback}`, 'PLAN_REVISION_REQUESTED')
+            : `The user chose to keep planning; their feedback: ${feedback}`)
         }
         // Keep plan guidance for the rest of this assistant tool batch. The
         // silent selection is appended at the next accepted in-turn pre-step,
@@ -404,7 +394,7 @@ export class PlanModeController extends Service {
 
   private planState(session: Session): PlanUnitState {
     if (this.planProjectionHandle === undefined) {
-      throw new PlanModeError('plan mode is not ready; await plugin activation before running an agent', 'PLAN_STATE_UNAVAILABLE')
+      throw new Error('plan mode is not ready; await plugin activation before running an agent')
     }
     return this.planProjectionHandle.stateOf(session)
   }

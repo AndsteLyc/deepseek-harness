@@ -319,9 +319,8 @@ const root = {
   inject() { return { dispose() {} }; },
   provide(name, value) { this[name] = value; return () => { delete this[name]; }; },
 };
-const rootKey = Symbol.for('cordis.root');
-root[rootKey] = root;
-const cordis = { Context: { root: rootKey, is(value) { return value?.__inspectorContext === true; } } };
+root.root = root;
+const cordis = { Context: { is(value) { return value?.__inspectorContext === true; } } };
 const plugin = registration.factory(specifier => {
   if (specifier === '@deepseek-ai/cordis') return cordis;
   throw new Error('Unexpected Client bundle dependency ' + specifier);

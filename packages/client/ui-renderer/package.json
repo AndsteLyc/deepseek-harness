@@ -28,7 +28,6 @@
   },
   "dsh": {
     "client": {
-      "inject": ["@deepseek-ai/dsh-client-modules"],
       "platform": "web",
       "immediately": true
     }
@@ -45,12 +44,10 @@
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-client-test-runtime": "workspace:*",
     "@deepseek-ai/dsh-client-ui-slots": "workspace:*",
-    "@deepseek-ai/dsh-client-modules": "workspace:*",
     "@types/use-sync-external-store": "^1.5.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "use-sync-external-store": "1.6.0",
-    "@deepseek-ai/dsh-package-manifest": "workspace:*"
+    "use-sync-external-store": "1.6.0"
   },
   "files": [
     "locale/*.json",

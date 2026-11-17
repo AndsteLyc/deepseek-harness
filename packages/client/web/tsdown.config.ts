@@ -1,6 +1,6 @@
-import { clientShell } from '../tsdown.client.ts'
+import { staticLinked } from '../tsdown.client.ts'
 
-export default clientShell(
+export default staticLinked(
   import.meta.dirname,
   ['lib/types/index.js', 'lib/types/apply-injections.js'],
 )

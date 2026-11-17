@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { removeOwnedStyles } from '../src/client/entry-lifecycle.ts'
 import { readRelease } from '../src/client/manifest.ts'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -22,8 +23,6 @@ const win = globalThis as DshWindow
 const bootstrapExports = { apply, createClientModuleSystem }
 
 type Factory = ClientBundleRegistration['factory']
-type Meta = NonNullable<ClientBundleRegistration['meta']>
-const stylesheet = (path: string, css: string): Meta => () => ({ stylesheets: { [path]: { text: () => css } } })
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -73,8 +72,7 @@ function bench(
   entries: BootModuleRow[],
   bundles: Record<string, Factory | null> = {},
   opts: {
-    seed?: readonly ClientBundleRegistration[]
-    metadata?: Record<string, Meta>
+    seed?: Record<string, unknown>
     gated?: string[]
     pending?: ClientBundleRegistration[]
     defaultTransport?: boolean
@@ -105,8 +103,7 @@ function bench(
       const id = sibling[1] as string
       const chunk = sibling[2] as string
       const factory = opts.chunks?.[`${id}/${chunk}`]
-      const meta = opts.metadata?.[`${id}/${chunk}`]
-      if (factory != null) win.__ModuleLoader__?.load({ id, chunk, factory, ...(meta === undefined ? {} : { meta }) })
+      if (factory != null) win.__ModuleLoader__?.load({ id, chunk, factory })
       return
     }
     const batchIds = url === BOOTSTRAP_URL
@@ -123,8 +120,7 @@ function bench(
     for (const id of batchIds ?? (singleId === undefined ? [] : [singleId])) {
       if (only !== undefined && !only.includes(id)) continue
       const factory = bundles[id]
-      const meta = opts.metadata?.[id]
-      if (factory != null) win.__ModuleLoader__?.load({ id, factory, ...(meta === undefined ? {} : { meta }) })
+      if (factory != null) win.__ModuleLoader__?.load({ id, factory })
     }
   }
   const bootstrapEntries = entries.filter(entry => entry.initialUrl === BOOTSTRAP_URL).map(entry => entry.id)
@@ -147,91 +143,12 @@ function bench(
       })),
       batches,
     },
-    staticModules: opts.seed ?? [],
+    staticModules: opts.seed ?? {},
     ...(opts.defaultTransport === true ? {} : { loadBundle }),
     ...(opts.resolveAsset === undefined ? {} : { resolveAsset: opts.resolveAsset }),
   })
   return { loader, target, fetched, gates }
 }
-
-describe('materialized module inventory', () => {
-  it('retains only successful records and reports chunk ownership without loading lazy code', async () => {
-    let loadChunk!: () => Promise<unknown>
-    const b = bench([row('a'), row('b'), row('broken')], {
-      a: (require) => { loadChunk = () => require.async('./client.details.js'); return {} },
-      b: () => ({}),
-      broken: () => { throw new Error('factory failed') },
-    }, {
-      seed: [{ id: 'platform', factory: () => ({}) }],
-      chunks: { 'a/client.details.js': () => ({}) },
-    })
-    const ids = () => [...b.loader.loadCache.keys()].sort()
-    const changed = vi.fn()
-    const off = b.loader.subscribeModules(changed)
-    expect(ids()).toEqual([MODULES_ID])
-    await b.loader.import('platform', '', {})
-    expect(ids()).toEqual([MODULES_ID, 'platform'])
-    expect(changed).toHaveBeenCalledTimes(1)
-    expect(b.fetched).toEqual([])
-    await b.loader.prefetch('a')
-    expect(ids()).toEqual([MODULES_ID, 'platform'])
-    expect(changed).toHaveBeenCalledTimes(1)
-    await b.loader.import('a', '', {})
-    expect(ids()).toEqual([MODULES_ID, 'a', 'platform'])
-    expect(b.fetched).not.toContain(chunkReference('a', 'client.details.js'))
-    await loadChunk()
-    expect(ids()).toEqual([MODULES_ID, 'a', 'a/client.details.js', 'platform'])
-    expect(b.loader.loadCache.get('a/client.details.js')?.ownerId).toBe('a')
-    await expect(b.loader.import('broken', '', {})).rejects.toThrow('factory failed')
-    expect(b.loader.loadCache.has('broken')).toBe(false)
-    await b.loader.import('b', '', {})
-    expect(ids()).toEqual([MODULES_ID, 'a', 'a/client.details.js', 'b', 'platform'])
-    b.loader.invalidate('a')
-    expect(ids()).toEqual([MODULES_ID, 'b', 'platform'])
-    off()
-  })
-
-  it('retains the owner identity of an already-materialized standalone chunk', async () => {
-    const b = bench([], {}, { pending: [{ id: 'owner', chunk: 'client.details.js', factory: () => ({}) }] })
-    await b.loader.import('owner/client.details.js', '', {})
-    expect([...b.loader.loadCache.keys()]).toEqual([MODULES_ID, 'owner/client.details.js'])
-    expect(b.loader.loadCache.get('owner/client.details.js')?.ownerId).toBe('owner')
-    expect(b.fetched).toEqual([])
-  })
-
-  it('records loaded dynamic and static dependency edges without further transport', async () => {
-    const b = bench([row('a'), row('b')], {
-      a: (require) => { require('b'); return {} },
-      b: (require) => { require('shared'); return {} },
-    }, {
-      seed: [
-        { id: 'shared', factory: (require) => { require('base'); return {} } },
-        { id: 'base', factory: () => ({}) },
-      ],
-    })
-    await b.loader.import('a', '', {})
-    const fetched = [...b.fetched]
-    expect(b.loader.loadCache.get('a')?.edges).toEqual(new Set(['b']))
-    expect(b.loader.loadCache.get('b')?.edges).toEqual(new Set(['shared']))
-    expect(b.loader.loadCache.get('shared')?.edges).toEqual(new Set(['base']))
-    expect(b.fetched).toEqual(fetched)
-  })
-
-  it('records lazy chunk dependencies only after its factory materializes', async () => {
-    let loadChunk!: () => Promise<unknown>
-    const b = bench([row('a'), row('b')], {
-      a: (require) => { loadChunk = () => require.async('./client.details.js'); return {} },
-      b: () => ({}),
-    }, { chunks: { 'a/client.details.js': (require) => { require('b'); return {} } } })
-    await b.loader.import('a', '', {})
-    expect(b.loader.loadCache.get('a')?.edges).toEqual(new Set())
-    expect(b.loader.loadCache.has('a/client.details.js')).toBe(false)
-    expect(b.fetched).not.toContain(chunkReference('a', 'client.details.js'))
-    await loadChunk()
-    expect(b.loader.loadCache.get('a')?.edges).toEqual(new Set(['./client.details.js']))
-    expect(b.loader.loadCache.get('a/client.details.js')?.edges).toEqual(new Set(['b']))
-  })
-})
 
 describe('Cordis plugin face', () => {
   it('rejects a Loader whose internal is absent or not a client module system', () => {
@@ -290,7 +207,7 @@ describe('lazy CJS arrival', () => {
     ], {
       consumer: req => ({ provider: req('provider/client'), react: req('react') }),
       provider: () => ({ marker: 'provider' }),
-    }, { seed: [{ id: 'react', factory: () => ({ marker: 'react' }) }] })
+    }, { seed: { react: { marker: 'react' } } })
     const exports = await b.loader.import('consumer', '', {}) as {
       provider: { marker: string }
       react: { marker: string }
@@ -339,12 +256,9 @@ describe('lazy CJS arrival', () => {
     const factory: Factory = req => ({ url: req.asset(reference) })
     const served = bench([row('a')], { a: factory })
     expect(await served.loader.import('a', '', {})).toEqual({ url: reference })
-    expect(served.loader.resolveAsset(reference)).toBe(reference)
 
     const mapped = bench([row('a')], { a: factory }, { resolveAsset: asset => `blob:${asset}` })
     expect(await mapped.loader.import('a', '', {})).toEqual({ url: `blob:${reference}` })
-    const resolveAsset = mapped.loader.resolveAsset
-    expect(resolveAsset(reference)).toBe(`blob:${reference}`)
   })
 
   it('loads a package-local dynamic chunk only when its factory requests it', async () => {
@@ -601,15 +515,15 @@ describe('require resolution', () => {
     expect(b.loader.loadCache.has('b')).toBe(true)
   })
 
-  it('require and import share one materialized platform instance', async () => {
+  it('require prefers the platform seed word over the module table', async () => {
     const react = { marker: 'react' }
     const b = bench([row('a')], {
       a: req => ({ dep: req('react') }),
-    }, { seed: [{ id: 'react', factory: () => react }] })
+    }, { seed: { react } })
     const exports = await b.loader.import('a', '', {})
     expect((exports as { dep: unknown }).dep).toBe(react)
     expect(await b.loader.import('react', '', {})).toBe(react)
-    expect(b.loader.loadCache.get('react')?.exports).toBe(react)
+    expect(b.loader.loadCache.has('react')).toBe(false)
   })
 
   it('require answers an already-materialized module from the cache', async () => {
@@ -655,8 +569,8 @@ describe('bootstrap module', () => {
   })
 
   it('publishes the module system attached to its own Loader', () => {
-    const a = bench([], {})
-    const b = bench([], {})
+    const a = bench([])
+    const b = bench([])
     const ctxA = new Context()
     const ctxB = new Context()
     ctxA.reflect.provide('loader', { internal: a.loader })
@@ -671,18 +585,15 @@ describe('bootstrap module', () => {
 
   it('rejects a second queued registration for the bootstrap id', () => {
     expect(() => bench([], {}, {
-      pending: [{ id: MODULES_ID, factory: () => ({}) }],
-    })).toThrow(`duplicate factory registration for "${MODULES_ID}"`)
+      pending: [{ id: `${MODULES_ID}/client`, factory: () => ({}) }],
+    })).toThrow(`duplicate factory registration for "${MODULES_ID}/client"`)
   })
 })
 
 describe('failure modes', () => {
-  it('duplicate factory registration is loud, including reuse of the same manifest object', () => {
+  it('duplicate factory registration is loud', () => {
     bench([])
-    const registration = { id: 'x', factory: () => ({}) }
-    win.__ModuleLoader__?.load(registration)
-    expect(() => win.__ModuleLoader__?.load(registration))
-      .toThrow('duplicate factory registration for "x"')
+    win.__ModuleLoader__?.load({ id: 'x', factory: () => ({}) })
     expect(() => win.__ModuleLoader__?.load({ id: 'x', factory: () => ({}) }))
       .toThrow('duplicate factory registration for "x"')
   })
@@ -761,7 +672,7 @@ describe('failure modes', () => {
     const b = bench([])
     const options: ClientModuleCreateOptions = {
       boot: { rev: 'graph', entries: [], batches: [] },
-      staticModules: [],
+      staticModules: {},
     }
     expect(() => b.target.create(options)).toThrow('create called after module-system boot')
   })
@@ -931,72 +842,68 @@ describe('HMR reset', () => {
   })
 })
 
-describe('opaque module metadata', () => {
-  it('retains metadata producers for external consumers without claiming document nodes', async () => {
+describe('style claiming', () => {
+  it('claims untagged style tags for the materializing plugin and inventories owned css ids', async () => {
+    const foreign = document.createElement('style')
+    foreign.setAttribute('data-plugin', 'other')
+    document.head.appendChild(foreign)
+    const b = bench([row('a')], {
+      a: () => {
+        document.head.appendChild(document.createElement('style'))
+        const tagged = document.createElement('style')
+        tagged.setAttribute('data-plugin', 'a')
+        tagged.setAttribute('data-plugin-css', 'sheet-1')
+        document.head.appendChild(tagged)
+        return {}
+      },
+    })
+    await b.loader.import('a', '', {})
+    expect(b.loader.loadCache.get('a')?.styles).toEqual(['a', 'sheet-1'])
+    expect(document.querySelectorAll('style[data-plugin="a"]')).toHaveLength(2)
+    expect(foreign.getAttribute('data-plugin')).toBe('other')
+  })
+
+  it('leaves untagged style tags inserted before materialization unclaimed', async () => {
     const earlier = document.createElement('style')
-    earlier.textContent = '.earlier {}'
     document.head.appendChild(earlier)
-    const text = vi.fn(() => '.a {}')
-    const meta = vi.fn(() => ({ stylesheets: { 'a.css': { text } } }))
-    const b = bench([row('a')], { a: () => ({}) }, { metadata: { a: meta } })
-    await b.loader.prefetch('a')
-    expect(meta).not.toHaveBeenCalled()
+    const b = bench([row('a')], { a: () => ({}) })
     await b.loader.import('a', '', {})
-    expect(meta).not.toHaveBeenCalled()
-    expect(text).not.toHaveBeenCalled()
-    expect(b.loader.loadCache.get('a')?.meta).toBe(meta)
-    expect(meta).not.toHaveBeenCalled()
-    expect(text).not.toHaveBeenCalled()
-    expect([...document.querySelectorAll('style')]).toEqual([earlier])
-    expect(earlier.getAttributeNames()).toEqual([])
-    b.loader.invalidate('a')
-    expect(b.loader.loadCache.has('a')).toBe(false)
+    removeOwnedStyles('a')
     expect(earlier.isConnected).toBe(true)
+    expect(earlier.hasAttribute('data-plugin')).toBe(false)
   })
 
-  it('does not claim style nodes inserted by plugin code before a nested require', async () => {
-    const inserted = document.createElement('style')
+  it('assigns an untagged style to the factory that inserted it before a nested require', async () => {
+    const outer = document.createElement('style')
     const b = bench([row('b'), row('a', { external: ['b'] })], {
-      a: (require) => { document.head.appendChild(inserted); require('b'); return {} },
+      a: (require) => {
+        document.head.appendChild(outer)
+        require('b')
+        return {}
+      },
       b: () => ({}),
-    }, { metadata: { a: stylesheet('a.css', '.a {}'), b: stylesheet('b.css', '.b {}') } })
+    })
     await b.loader.import('a', '', {})
-    expect(inserted.getAttributeNames()).toEqual([])
-    expect([...document.querySelectorAll('style')]).toEqual([inserted])
-    expect(b.loader.loadCache.get('a')?.edges).toEqual(new Set(['b']))
+    expect(outer.getAttribute('data-plugin')).toBe('a')
   })
 
-  it('does not evaluate failed factory metadata or remove document nodes', async () => {
-    const existing = document.createElement('style')
-    existing.dataset.plugin = 'a'
-    document.head.appendChild(existing)
-    const inserted = document.createElement('style')
-    const meta = vi.fn(stylesheet('a.css', '.a {}'))
-    const b = bench([row('a')], { a: () => {
-      document.head.appendChild(inserted)
-      throw new Error('factory exploded')
-    } }, { metadata: { a: meta } })
-    const changed = vi.fn()
-    const off = b.loader.subscribeModules(changed)
+  it('removes untagged styles inserted by a factory that throws', async () => {
+    const leaked = document.createElement('style')
+    const b = bench([row('a')], { a: () => { document.head.appendChild(leaked); throw new Error('factory exploded') } })
     await expect(b.loader.import('a', '', {})).rejects.toThrow('factory exploded')
-    expect(b.loader.loadCache.has('a')).toBe(false)
-    expect(meta).not.toHaveBeenCalled()
-    expect(b.loader.loadCache.has('a')).toBe(false)
-    expect(changed).not.toHaveBeenCalled()
-    off()
-    expect([...document.querySelectorAll('style')]).toEqual([existing, inserted])
-    expect(inserted.getAttributeNames()).toEqual([])
+    expect(leaked.isConnected).toBe(false)
   })
 
-  it('retains opaque metadata without a document', async () => {
-    const b = bench([row('a')], { a: () => ({}) }, { metadata: { a: stylesheet('a.css', '.a {}') } })
+  it('materialization without a document skips the style inventory', async () => {
+    const b = bench([row('a')], { a: () => ({}) })
     vi.stubGlobal('document', undefined)
     try {
       await b.loader.import('a', '', {})
-      expect(typeof b.loader.loadCache.get('a')?.meta).toBe('function')
+      removeOwnedStyles('a')
     } finally {
       vi.unstubAllGlobals()
     }
+    expect(b.loader.loadCache.get('a')?.styles).toEqual([])
   })
 })
 
@@ -1036,7 +943,7 @@ describe('default transport seam', () => {
 
 it('rejects invalid revision URLs and keeps bootstrap exports pinned under invalidation', () => {
   const b = bench([row(MODULES_ID), row('a', { url: '/unrevisioned' })])
-  expect(() =>{  b.loader.invalidate(MODULES_ID) }).toThrow(/requires a page reload/)
+  b.loader.invalidate(MODULES_ID)
   expect(b.loader.loadCache.get(MODULES_ID)?.exports).toBe(bootstrapExports)
   expect(() =>{  b.loader.invalidate('a', 'next') }).toThrow('has no revision')
 })
@@ -1045,7 +952,7 @@ it('prefetch skips platform requests, cached dependencies and absent optional in
   const b = bench([
     row('a'),
     row('b', { external: ['platform', 'a/client'], inject: ['missing'] }),
-  ], { a: () => ({}), b: () => ({}) }, { seed: [{ id: 'platform', factory: () => ({}) }] })
+  ], { a: () => ({}), b: () => ({}) }, { seed: { platform: {} } })
   await b.loader.import('a', '', {})
   await b.loader.import('b', '', {})
   expect(b.fetched).toEqual([APPLICATION_URL])

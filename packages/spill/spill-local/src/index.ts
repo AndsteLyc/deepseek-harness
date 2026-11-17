@@ -13,8 +13,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import z from '@deepseek-ai/schemastery'
-import { type SpillLocator, SpillStore } from '@deepseek-ai/dsh-spill'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { SpillLocator, SpillStore } from '@deepseek-ai/dsh-spill'
 import type { SaveTextSpill, SpillRef } from '@deepseek-ai/dsh-spill'
 import { gatherSweepRoots, sweepSpillRoots } from './cleanup.ts'
 import type { SweepRoot, WarnFn } from './cleanup.ts'
@@ -155,7 +154,7 @@ export class LocalSpillStore extends SpillStore {
       content: input.content,
     })
     return {
-      locator: brandString<SpillLocator>(saved.path),
+      locator: SpillLocator(saved.path),
       bytes: saved.bytes,
       retrievalHint: 'Use read with offset/limit, or grep this path to search within it.',
     }

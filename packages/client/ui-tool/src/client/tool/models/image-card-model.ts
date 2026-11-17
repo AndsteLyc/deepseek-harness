@@ -1,6 +1,5 @@
 /** Pure image-card derivation from raw result content and metadata. @module */
-import type { AttachmentId } from '@deepseek-ai/dsh-attachment/types'
-import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
+import type { AttachmentId, ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import type { ToolCallBlock } from './tool-call-model.ts'
 import { parsedToolCall } from './raw-tool-call.ts'
 

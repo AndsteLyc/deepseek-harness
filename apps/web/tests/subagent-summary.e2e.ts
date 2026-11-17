@@ -3,9 +3,8 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Agent, AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import {
-  AssistantStreamAccumulator, type LlmAttemptId, type ToolCallId,
+  AssistantStreamAccumulator, LlmAttemptId, ToolCallId,
   createAssistantMessage, createToolResultMessage, createUserMessage,
   type StreamChunk,
 } from '@deepseek-ai/dsh-llm'
@@ -102,7 +101,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagent task summary', () => {
   })
 
   it('streams the description and preserves it through creation and restored history', async () => {
-    const callId = brandString<ToolCallId>('subagent-summary-described')
+    const callId = ToolCallId('subagent-summary-described')
     const selector = toolSelector(callId)
     const card = page.locator(selector)
     const snapshots: string[] = []
@@ -114,7 +113,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagent task summary', () => {
     await scaffold.ctx.sessions.flush(agent.session)
     await page.locator('[data-chat-turn="1"]').getByText('Inspect subagent summary case 1.', { exact: true }).waitFor()
 
-    const attemptId = brandString<LlmAttemptId>('subagent-summary-stream')
+    const attemptId = LlmAttemptId('subagent-summary-stream')
     const stream = new AssistantStreamAccumulator()
     let revision = 0
     let index = 0
@@ -191,7 +190,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagent task summary', () => {
     const snapshots: string[] = []
     for (const [index, fixture] of cases.entries()) {
       const turn = index + 2
-      const callId = brandString<ToolCallId>(`subagent-summary-${fixture.id}`)
+      const callId = ToolCallId(`subagent-summary-${fixture.id}`)
       const selector = toolSelector(callId)
       const card = page.locator(selector)
       startTurn(agent, turn)
@@ -224,7 +223,7 @@ describe.skipIf(MODE === 'record')('web e2e: subagent task summary', () => {
 
   it('presents fork creation with a distinct title, task summary, and restored receipt', async () => {
     const name = 'subagent_fork'
-    const callId = brandString<ToolCallId>('subagent-fork-summary')
+    const callId = ToolCallId('subagent-fork-summary')
     const selector = `[data-chat-call-id="${callId}"] [data-tool="${name}"]`
     const card = page.locator(selector)
     const description = 'Review inherited conversation context'

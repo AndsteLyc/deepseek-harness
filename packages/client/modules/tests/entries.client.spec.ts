@@ -2,12 +2,8 @@
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createClientModuleSystem } from '../src/client/index.ts'
+import { apply as provideModules, createClientModuleSystem } from '../src/client/index.ts'
 import type { ClientBundleRegistration, ClientModuleLoaderTarget, WebBootRelease, WebBootEntry, WebBootGraph } from '../src/client/index.ts'
-
-type Factory = ClientBundleRegistration['factory']
-type FixtureModule = Factory | Pick<ClientBundleRegistration, 'factory' | 'meta'>
-const stylesheet = (path: string, css: string): NonNullable<ClientBundleRegistration['meta']> => () => ({ stylesheets: { [path]: { text: () => css } } })
 
 const contexts: Context[] = []
 afterEach(async () => {
@@ -15,6 +11,7 @@ afterEach(async () => {
     await ctx.fiber.dispose()
     await ctx.fiber.await()
   }
+  document.head.querySelectorAll('style').forEach((el) => { el.remove() })
   document.body.replaceChildren()
   vi.restoreAllMocks()
 })
@@ -32,26 +29,21 @@ const deferred = () => {
   return { promise, resolve }
 }
 
-async function bench(initial: WebBootGraph, factories: Record<string, FixtureModule>, start = true) {
+async function bench(initial: WebBootGraph, factories: Record<string, ClientBundleRegistration['factory']>, start = true) {
   const ctx = new Context()
   contexts.push(ctx)
   const fetched: string[] = []
   const target: ClientModuleLoaderTarget = {
     mode: 'queue', pendingQueue: [], load: () => {},
-    create: options => createClientModuleSystem(target, { id: 'bootstrap', exports: { inject: ['loader'], apply(ctx: Context) { ctx.reflect.provide('modules', ctx.loader.internal) } } }, options),
+    create: options => createClientModuleSystem(target, { id: 'bootstrap', exports: { inject: ['loader'], apply: provideModules } }, options),
   }
   let arrival: (url: string) => Promise<void> = async () => {}
   const modules = target.create({
-    boot: initial, staticModules: [],
+    boot: initial, staticModules: {},
     loadBundle: async (url) => {
       fetched.push(url)
       const ids = url === '/batch' ? initial.entries.map(row => row.id).filter(id => id !== 'bootstrap') : [url.split('??')[1]!.split('/client.js')[0]!]
-      const registrations = ids.map((id) => {
-        const definition = factories[id]!
-        return typeof definition === 'function'
-          ? { id, factory: definition }
-          : { id, ...definition }
-      })
+      const registrations = ids.map(id => ({ id, factory: factories[id]! }))
       await arrival(url)
       for (const registration of registrations) target.load(registration)
     },
@@ -62,11 +54,14 @@ async function bench(initial: WebBootGraph, factories: Record<string, FixtureMod
   return { ctx, modules, fetched, target, arrival: (fn: typeof arrival) => { arrival = fn } }
 }
 
-/** A visible plugin with opaque metadata and a listener owned by its fiber. */
-function visible(id: string, effects: { mounted: number; disposed: number; hits: number }, cleanup?: () => Promise<void>): Pick<ClientBundleRegistration, 'factory' | 'meta'> {
-  return {
-    meta: vi.fn(stylesheet(`${id}.css`, `[data-live="${id}"] { color: rgb(12, 34, 56); }`)),
-    factory: () => ({ apply(ctx: Context) {
+/** A visible plugin whose style and listener are owned by its factory and fiber respectively. */
+function visible(id: string, effects: { mounted: number; disposed: number; hits: number }, cleanup?: () => Promise<void>) {
+  return () => {
+    const style = document.createElement('style')
+    style.dataset.plugin = id
+    style.textContent = `[data-live="${id}"] { color: rgb(12, 34, 56); }`
+    document.head.append(style)
+    return { apply(ctx: Context) {
       ctx.effect(() => {
         effects.mounted++
         const el = document.createElement('div')
@@ -81,23 +76,21 @@ function visible(id: string, effects: { mounted: number; disposed: number; hits:
           effects.disposed++
         }
       })
-    } }),
+    } }
   }
 }
 
 describe('client manifest entries', () => {
-  it('adds, drains removal and re-enables one module record; unrelated entries survive', async () => {
+  it('adds, drains removal and re-enables one instance with styles; unrelated entries survive', async () => {
     const effects = { mounted: 0, disposed: 0, hits: 0 }
     const cleanup = deferred()
-    const plugin = visible('pet', effects, () => cleanup.promise)
-    const b = await bench(graph(), { pet: plugin })
+    const b = await bench(graph(), { pet: visible('pet', effects, () => cleanup.promise) })
     b.target.load({ id: 'local', factory: () => ({ apply() {} }) })
     const localId = await b.ctx.loader.create({ name: 'local' })
     await b.modules.entries.sync(graph(row('pet')))
     expect(b.fetched).toEqual([row('pet').url])
     expect(document.querySelectorAll('[data-live=pet]')).toHaveLength(1)
-    expect(b.modules.loadCache.get('pet')?.meta).toBe(plugin.meta)
-    expect(plugin.meta).not.toHaveBeenCalled()
+    expect(document.querySelectorAll('style[data-plugin=pet]')).toHaveLength(1)
     window.dispatchEvent(new Event('live-test'))
     expect(effects.hits).toBe(1)
     const removing = b.modules.entries.sync(graph())
@@ -108,14 +101,13 @@ describe('client manifest entries', () => {
     cleanup.resolve()
     await Promise.all([removing, readding])
     expect(effects).toEqual({ mounted: 2, disposed: 1, hits: 1 })
-    expect(b.modules.loadCache.get('pet')?.meta).toBe(plugin.meta)
-    expect(plugin.meta).not.toHaveBeenCalled()
+    expect(document.querySelectorAll('style[data-plugin=pet]')).toHaveLength(1)
     expect(b.ctx.loader.resolve(localId).fiber?.state).toBe(2)
     await b.modules.entries.sync(graph())
     window.dispatchEvent(new Event('live-test'))
     expect(effects).toEqual({ mounted: 2, disposed: 2, hits: 1 })
+    expect(document.querySelectorAll('style[data-plugin=pet]')).toHaveLength(0)
     expect(b.modules.loadCache.has('pet')).toBe(false)
-    expect(plugin.meta).not.toHaveBeenCalled()
     expect(b.modules.entries.state.getSnapshot()).toEqual({ syncing: false, failures: [] })
   })
 
@@ -184,8 +176,7 @@ describe('client manifest entries', () => {
 
   it('deduplicates rebuilt and graph revisions and retries after failed code arrival', async () => {
     const effects = { mounted: 0, disposed: 0, hits: 0 }
-    const plugin = visible('pet', effects)
-    const b = await bench(graph(row('pet')), { pet: plugin })
+    const b = await bench(graph(row('pet')), { pet: visible('pet', effects) })
     await b.modules.entries.reload('pet', 'r1')
     await b.modules.entries.sync(graph(row('pet', 'r1')))
     expect(effects).toEqual({ mounted: 2, disposed: 1, hits: 0 })
@@ -195,8 +186,7 @@ describe('client manifest entries', () => {
     b.arrival(async () => {})
     await b.modules.entries.retry()
     expect(effects).toEqual({ mounted: 3, disposed: 2, hits: 0 })
-    expect(b.modules.loadCache.get('pet')?.meta).toBe(plugin.meta)
-    expect(plugin.meta).not.toHaveBeenCalled()
+    expect(document.querySelectorAll('style[data-plugin=pet]')).toHaveLength(1)
   })
 
   it('rejects malformed graphs before mutating active entries', async () => {
@@ -250,20 +240,18 @@ it('reports reconciliation before startup and missing service activation without
   expect(b.modules.entries.state.getSnapshot().failures).toEqual([])
 })
 
-it('retries a materialization failure without publishing a partial module record', async () => {
+it('retries a materialization failure with the same graph and cleans its partial styles', async () => {
   let broken = true
-  const meta = vi.fn(stylesheet('a.css', '.a {}'))
-  const b = await bench(graph(), { a: {
-    factory: () => {
-      if (broken) throw new Error('factory failed')
-      return { apply() {} }
-    },
-    meta,
+  const b = await bench(graph(), { a: () => {
+    const style = document.createElement('style')
+    style.dataset.plugin = 'a'
+    document.head.append(style)
+    if (broken) throw new Error('factory failed')
+    return { apply() {} }
   } })
   await b.modules.entries.sync(graph(row('a')))
   expect(b.modules.entries.state.getSnapshot().failures[0]?.message).toContain('factory failed')
-  expect(b.modules.loadCache.has('a')).toBe(false)
-  expect(meta).not.toHaveBeenCalled()
+  expect(document.querySelectorAll('style[data-plugin=a]')).toHaveLength(0)
   await b.modules.entries.retry()
   expect(b.modules.entries.state.getSnapshot().failures[0]?.message).toContain('factory failed')
   await b.modules.entries.reload('a', 'r1').catch(() => {})
@@ -271,8 +259,7 @@ it('retries a materialization failure without publishing a partial module record
   broken = false
   await b.modules.entries.retry()
   expect(b.modules.entries.state.getSnapshot().failures).toEqual([])
-  expect(b.modules.loadCache.get('a')?.meta).toBe(meta)
-  expect(meta).not.toHaveBeenCalled()
+  expect(document.querySelectorAll('style[data-plugin=a]')).toHaveLength(1)
 })
 
 it('does not finish a stale code replacement after download or asynchronous teardown', async () => {
@@ -297,95 +284,6 @@ it('does not finish a stale code replacement after download or asynchronous tear
   expect(b.modules.loadCache.has('a')).toBe(false)
 })
 
-it('keeps the previous module records active until the replaced runtime has been torn down', async () => {
-  const effects = { mounted: 0, disposed: 0, hits: 0 }
-  const cleanup = deferred()
-  const b = await bench(graph(row('a')), { a: visible('a', effects, () => cleanup.promise) })
-  const previous = b.modules.loadCache.get('a')!
-  const active = (): boolean => [...b.modules.activeRecords()].includes(previous)
-  const published: boolean[] = []
-  b.modules.subscribeModules(() => { published.push(active()) })
-  const download = deferred()
-  const started = deferred()
-  b.arrival(async () => { started.resolve(); await download.promise })
-  const replacing = b.modules.entries.reload('a', 'r1')
-  await started.promise
-  // The replacement is downloading while the previous runtime is still mounted.
-  expect(document.querySelectorAll('[data-live=a]')).toHaveLength(1)
-  expect(b.modules.loadCache.has('a')).toBe(false)
-  expect(active()).toBe(true)
-  download.resolve()
-  await vi.waitFor(() => { expect(document.querySelector('[data-live=a]')).toBeNull() })
-  // Its asynchronous cleanup has not settled yet.
-  expect(active()).toBe(true)
-  expect(published).toEqual([])
-  cleanup.resolve()
-  await replacing
-  expect(published).toEqual([false, false])
-  expect(b.modules.loadCache.get('a')).not.toBe(previous)
-  expect([...b.modules.activeRecords()]).toContain(b.modules.loadCache.get('a'))
-  expect(effects).toEqual({ mounted: 2, disposed: 1, hits: 0 })
-})
-
-it('keeps the previous module records active while a failed replacement leaves the old runtime running', async () => {
-  const effects = { mounted: 0, disposed: 0, hits: 0 }
-  const b = await bench(graph(row('a')), { a: visible('a', effects) })
-  const previous = b.modules.loadCache.get('a')!
-  const published = vi.fn()
-  b.modules.subscribeModules(published)
-  b.arrival(async () => { throw new Error('offline') })
-  await expect(b.modules.entries.reload('a', 'r1')).rejects.toThrow('offline')
-  expect(document.querySelectorAll('[data-live=a]')).toHaveLength(1)
-  expect([...b.modules.activeRecords()]).toContain(previous)
-  expect(published).not.toHaveBeenCalled()
-  b.arrival(async () => {})
-  await b.modules.entries.reload('a', 'r2')
-  expect([...b.modules.activeRecords()]).not.toContain(previous)
-  expect(effects).toEqual({ mounted: 2, disposed: 1, hits: 0 })
-  b.arrival(async () => { throw new Error('offline') })
-  const current = b.modules.loadCache.get('a')!
-  await expect(b.modules.entries.reload('a', 'r3')).rejects.toThrow('offline')
-  expect([...b.modules.activeRecords()]).toContain(current)
-  // Disabling the plugin releases records that a failed replacement left active.
-  await b.modules.entries.sync(graph())
-  expect([...b.modules.activeRecords()]).not.toContain(current)
-  expect(document.querySelector('[data-live=a]')).toBeNull()
-})
-
-it('retains a module that only a running replaced runtime requests when the graph drops it', async () => {
-  const effects = { mounted: 0, disposed: 0, hits: 0 }
-  const plugin = visible('a', effects)
-  const b = await bench(graph(row('a'), row('b')), {
-    a: { ...plugin, factory: (require) => { require('b'); return plugin.factory(require) } },
-    b: () => ({ apply() {} }),
-  })
-  const library = b.modules.loadCache.get('b')!
-  b.arrival(async () => { throw new Error('offline') })
-  await expect(b.modules.entries.reload('a', 'r1')).rejects.toThrow('offline')
-  b.arrival(async () => {})
-  await b.modules.entries.sync(graph(row('a')))
-  // The previous runtime of `a` is still mounted and still uses `b`.
-  expect(document.querySelectorAll('[data-live=a]')).toHaveLength(1)
-  expect(b.modules.loadCache.get('b')).toBe(library)
-  expect([...b.modules.activeRecords()]).toContain(library)
-})
-
-it('replaces an entry whose previous import left no module record', async () => {
-  let broken = true
-  const b = await bench(graph(row('a')), { a: () => {
-    if (broken) throw new Error('factory failed')
-    return { apply() {} }
-  } })
-  expect(b.modules.loadCache.has('a')).toBe(false)
-  broken = false
-  const published: string[][] = []
-  b.modules.subscribeModules(() => { published.push([...b.modules.activeRecords()].map(record => record.id)) })
-  await b.modules.entries.reload('a', 'r1')
-  expect(b.ctx.loader.resolve([...b.ctx.loader.entries()].find(entry => entry.options.name === 'a')!.id).fiber?.state).toBe(2)
-  // Nothing was retained, so releasing the replaced records publishes nothing before the new record materializes.
-  expect(published).toEqual([['bootstrap', 'a']])
-})
-
 it('stops an obsolete multi-entry application after awaiting removal', async () => {
   const cleanup = deferred()
   const effects = { mounted: 0, disposed: 0, hits: 0 }
@@ -408,27 +306,20 @@ it('keeps bootstrap ownership explicit and diagnoses removal without changing en
   expect(b.modules.entries.state.getSnapshot().failures).toEqual([])
 })
 
-it('retains an unrelated module record while reporting a failed replacement', async () => {
+it('retains unrelated style tags while reporting a failed replacement', async () => {
   let broken = false
   const effects = { mounted: 0, disposed: 0, hits: 0 }
-  const plugin = visible('a', effects)
-  const b = await bench(graph(row('a')), { a: {
-    ...plugin,
-    factory: (require) => {
-      if (broken) throw new Error('changed factory failed')
-      return plugin.factory(require)
-    },
+  const b = await bench(graph(row('a')), { a: () => {
+    if (broken) throw new Error('changed factory failed')
+    return visible('a', effects)()
   } })
-  b.target.load({ id: 'unrelated', factory: () => ({ apply() {} }) })
-  await b.ctx.loader.create({ name: 'unrelated' })
-  const unrelated = b.modules.loadCache.get('unrelated')
-  expect(unrelated).toBeDefined()
+  const unrelated = document.createElement('style')
+  unrelated.dataset.plugin = 'unrelated'
+  document.head.append(unrelated)
   broken = true
   await b.modules.entries.sync(graph(row('a', 'r1')))
   expect(b.modules.entries.state.getSnapshot().failures[0]?.message).toContain('changed factory failed')
-  expect(b.modules.loadCache.has('a')).toBe(false)
-  expect(b.modules.loadCache.get('unrelated')).toBe(unrelated)
-  expect(plugin.meta).not.toHaveBeenCalled()
+  expect(unrelated.isConnected).toBe(true)
 })
 
 
@@ -535,13 +426,12 @@ it('coalesces an overlapping graph snapshot with the same rebuilt artifact', asy
 
 it.each(['graph', 'rebuilt'])('replaces a failed factory before entry creation on a new %s revision', async (source) => {
   const effects = { mounted: 0, disposed: 0, hits: 0 }
-  const factories: Record<string, FixtureModule> = { a: () => { throw new Error('broken r0 factory') } }
+  const factories: Record<string, ClientBundleRegistration['factory']> = { a: () => { throw new Error('broken r0 factory') } }
   const b = await bench(graph(), factories)
   await b.modules.entries.sync(graph(row('a')))
   expect([...b.ctx.loader.entries()]).toHaveLength(0)
   expect(b.modules.entries.state.getSnapshot().failures[0]?.message).toContain('broken r0 factory')
-  const replacement = visible('a', effects)
-  factories.a = { ...replacement, factory: require => ({ ...replacement.factory(require), revision: 'r1' }) }
+  factories.a = () => ({ ...visible('a', effects)(), revision: 'r1' })
   if (source === 'graph') await b.modules.entries.sync(graph(row('a', 'r1')))
   else await b.modules.entries.reload('a', 'r1')
   await b.modules.entries.retry()
@@ -555,7 +445,7 @@ it.each(['graph', 'rebuilt'])('replaces a failed factory before entry creation o
 it('replaces a superseded arrival and its cached dependency before mounting the latest code', async () => {
   const dependency = row('dependency')
   const consumer = row('consumer', 'r0', { external: ['dependency/client'] })
-  const factories: Record<string, FixtureModule> = {
+  const factories: Record<string, ClientBundleRegistration['factory']> = {
     dependency: () => ({ apply() {}, revision: 'r0' }),
     consumer: require => ({ apply() {}, dependency: require('dependency/client'), revision: 'r0' }),
   }
@@ -582,9 +472,8 @@ it('replaces a superseded arrival and its cached dependency before mounting the 
 
 it.each(['graph', 'rebuilt'])('preserves bootstrap and dependent fibers when a %s requests new bootstrap code', async (source) => {
   const effects = { mounted: 0, disposed: 0, hits: 0 }
-  const consumer = visible('consumer', effects)
   const b = await bench(graph(row('bootstrap'), row('consumer')), {
-    consumer: { ...consumer, factory: require => ({ ...consumer.factory(require), inject: ['modules'] }) },
+    consumer: () => ({ ...visible('consumer', effects)(), inject: ['modules'] }),
   })
   const fibers = [...b.ctx.loader.entries()].map(entry => entry.fiber)
   const exports = await b.modules.import('bootstrap')
@@ -624,33 +513,23 @@ it('uses the latest desired revision when a rebuild queues before entry creation
   expect([...b.ctx.loader.entries()]).toHaveLength(1)
 })
 
-it('replaces metadata from a materialized factory superseded before its entry is created', async () => {
+it('cleans styles from a materialized factory superseded before its entry is created', async () => {
   const effects = { mounted: 0, disposed: 0, hits: 0 }
   let latest: Promise<void> | undefined
-  const replacement = visible('a', effects)
-  const oldMeta = vi.fn(() => ({ stylesheets: {
-    'old-a.css': { text: () => '.old {}' },
-    'a.css': { text: () => '[data-live="a"] { color: rgb(12, 34, 56); }' },
-  } }))
-  const factories: Record<string, FixtureModule> = { a: {
-    meta: oldMeta,
-    factory: (require) => {
-      const old = visible('a', effects).factory(require)
-      queueMicrotask(() => {
-        factories.a = replacement
-        latest = b.modules.entries.sync(graph(row('a', 'r1')))
-      })
-      return old
-    },
+  const factories: Record<string, ClientBundleRegistration['factory']> = { a: () => {
+    const old = visible('a', effects)()
+    queueMicrotask(() => {
+      factories.a = visible('a', effects)
+      latest = b.modules.entries.sync(graph(row('a', 'r1')))
+    })
+    return old
   } }
   const b = await bench(graph(), factories)
   await b.modules.entries.sync(graph(row('a')))
   await latest
   expect(b.fetched).toEqual([row('a').url, row('a', 'r1').url])
   expect(effects).toEqual({ mounted: 1, disposed: 0, hits: 0 })
-  expect(b.modules.loadCache.get('a')?.meta).toBe(replacement.meta)
-  expect(oldMeta).not.toHaveBeenCalled()
-  expect(replacement.meta).not.toHaveBeenCalled()
+  expect(document.querySelectorAll('style[data-plugin=a]')).toHaveLength(1)
 })
 
 describe('Host release changes', () => {

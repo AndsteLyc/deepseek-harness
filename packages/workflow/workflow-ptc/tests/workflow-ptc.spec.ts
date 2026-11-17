@@ -10,11 +10,10 @@ import type { SubagentCapabilities, SubagentProvider, SubagentResult, SubagentRu
 import type { WorkflowMeta, WorkflowResult, WorkflowResultInfo, WorkflowRun, WorkflowRunInfo } from '@deepseek-ai/dsh-workflow'
 import * as ptcEngineModule from '../src/index.ts'
 import PtcWorkflowEngine, { type Config } from '../src/index.ts'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 
 import { fakeParent, mountPtcRuntime } from './setup.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 /** Bound observations of process startup and host callbacks on shared CI runners. */
 function waitFor(assertion: () => void, timeout = 60_000): Promise<void> {
@@ -98,7 +97,7 @@ class StubProvider implements SubagentProvider {
     }
     if (request.signal.aborted) throw new Error('child start aborted before publication')
     return {
-      id: brandString<SessionId>(`stub-child-${index}`),
+      id: SessionId(`stub-child-${index}`),
       result: terminal.promise,
       dispose: () => {
         controlled.disposeCalls += 1
@@ -480,7 +479,7 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
         capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true },
         inheritsParentContext: false,
         start: async () => ({
-          id: brandString<SessionId>('reject-child'),
+          id: SessionId('reject-child'),
           result: Promise.reject(new Error('backend exploded')),
           dispose: () => Promise.resolve(),
         }),
@@ -514,7 +513,7 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
         stopReason: 'completed',
       } as unknown as SubagentResult
       const start = vi.spyOn(ctx.subagents, 'startActivation').mockResolvedValue({
-        childId: brandString<SessionId>('raw-invalid-child'), name: 'raw-invalid-child',
+        childId: SessionId('raw-invalid-child'), name: 'raw-invalid-child',
         result: Promise.resolve(invalid),
         dispose: () => Promise.resolve(),
       })
@@ -540,7 +539,7 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
         capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true },
         inheritsParentContext: false,
         start: async () => ({
-          id: brandString<SessionId>('bad-dispose-child'),
+          id: SessionId('bad-dispose-child'),
           result: Promise.resolve({ output: [{ type: 'text', text: 'fine' }], stopReason: 'completed' }),
           cancel: () => { /* settled already */ },
           dispose: () => { throw new Error('dispose exploded') },
@@ -564,7 +563,7 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
         capabilities: { agentOptions: true, agentPreset: false, outputSchema: true, depthLimit: true },
         inheritsParentContext: false,
         start: async () => ({
-          id: brandString<SessionId>('trap-child'),
+          id: SessionId('trap-child'),
           result: Promise.resolve({ output: [{ type: 'text', text: 'fine' }], stopReason: 'completed' }),
           cancel: () => { /* settled already */ },
           // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the non-Error rejection IS the scenario under test
@@ -789,7 +788,7 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
             settle({ output: [], stopReason: 'aborted' })
           }, { once: true })
           return {
-            id: brandString<SessionId>('signal-only-child'),
+            id: SessionId('signal-only-child'),
             result,
             dispose: () => Promise.resolve(),
           }
@@ -906,7 +905,7 @@ describe('dsh-workflow-ptc', { timeout: 120_000 }, () => {
           await release.promise
           await writeFile(resource, 'owned')
           return {
-            id: brandString<SessionId>('late-published-child'),
+            id: SessionId('late-published-child'),
             result: Promise.resolve({ output: [], stopReason: 'aborted' }),
             dispose: async () => { disposals += 1; await rm(resource) },
           }

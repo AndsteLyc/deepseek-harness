@@ -15,9 +15,6 @@
       "path": "../../../vendor/cordis"
     },
     {
-      "path": "../../util/error"
-    },
-    {
       "path": "../../core/tools"
     },
     {

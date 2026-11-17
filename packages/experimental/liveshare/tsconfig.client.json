@@ -49,9 +49,6 @@
   ],
   "references": [
     {
-      "path": "../../util/brand"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {

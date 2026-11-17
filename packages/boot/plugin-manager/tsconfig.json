@@ -39,9 +39,6 @@
       "path": "../../llm/llm"
     },
     {
-      "path": "../../util/error"
-    },
-    {
       "path": "../../subprocess/subprocess"
     },
     {

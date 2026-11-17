@@ -45,10 +45,7 @@ describe('graphFromRoster', () => {
     const b = { apply() {} }
     const modules = target.create({
       boot: graphFromRoster(ROWS),
-      staticModules: [
-        { id: '@x/a', factory: () => a },
-        { id: '@x/b', factory: () => b },
-      ],
+      staticModules: { '@x/a': a, '@x/b': b },
       loadBundle: async (url) => { loaded.push(url) },
     })
     await expect(modules.import('@x/a')).resolves.toBe(a)

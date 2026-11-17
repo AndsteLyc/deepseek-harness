@@ -4,7 +4,6 @@
  */
 
 import type { OfficeConversionFormat, OfficeRecalculationFormat } from '@deepseek-ai/dsh-office-kit'
-import { ToolArgsError } from '@deepseek-ai/dsh-tools'
 
 /** Operation requested by one Office tool call. */
 export type OfficeOperationName = 'render' | 'convert' | 'recalculate'
@@ -63,7 +62,7 @@ export type OfficeToolName = 'office_render' | 'office_convert' | 'office_recalc
  * @param tool - called tool.
  * @param args - call arguments.
  * @param declared - parameter names of every Office tool.
- * @throws ToolArgsError naming the undeclared key and the Office tools that accept it.
+ * @throws Error naming the undeclared key and the Office tools that accept it.
  */
 export function checkParameterNames(
   tool: OfficeToolName, args: object, declared: Readonly<Record<OfficeToolName, readonly string[]>>,
@@ -71,7 +70,7 @@ export function checkParameterNames(
   for (const key of Object.keys(args)) {
     if (declared[tool].includes(key)) continue
     const owners = (Object.keys(declared) as OfficeToolName[]).filter(other => declared[other].includes(key))
-    throw new ToolArgsError([owners.length === 0 ? `${tool} does not accept ${key}` : `${key} applies only to ${owners.join(' or ')}`])
+    throw new Error(owners.length === 0 ? `${tool} does not accept ${key}` : `${key} applies only to ${owners.join(' or ')}`)
   }
 }
 
@@ -91,18 +90,18 @@ export function extensionOf(path: string): string {
  * @param operation - requested operation.
  * @param path - input path whose extension names the format.
  * @returns the family the operation accepts.
- * @throws ToolArgsError naming the accepted formats when the operation does not accept this input.
+ * @throws Error naming the accepted formats when the operation does not accept this input.
  */
 export function inputFamily(operation: OfficeOperationName, path: string): OfficeFamily {
   const extension = extensionOf(path)
   const family = FAMILIES[extension]
   if (operation === 'recalculate') {
-    if (family !== 'spreadsheet') throw new ToolArgsError([`cannot recalculate "${path}": recalculate accepts xls, xlsx, or ods workbooks`])
+    if (family !== 'spreadsheet') throw new Error(`cannot recalculate "${path}": recalculate accepts xls, xlsx, or ods workbooks`)
     return family
   }
   if (family === undefined || (family === 'pdf' && operation === 'convert')) {
     const accepted = operation === 'render' ? 'doc, docx, odt, xls, xlsx, ods, ppt, pptx, odp, or pdf' : 'doc, docx, odt, xls, xlsx, ods, ppt, pptx, or odp'
-    throw new ToolArgsError([`cannot ${operation} "${path}": ${operation} accepts ${accepted} files`])
+    throw new Error(`cannot ${operation} "${path}": ${operation} accepts ${accepted} files`)
   }
   return family
 }
@@ -111,21 +110,21 @@ export function inputFamily(operation: OfficeOperationName, path: string): Offic
  * Check render selections that the tool schema subset cannot express.
  * @param args - schema-validated call arguments.
  * @param family - input family selected by {@link inputFamily}.
- * @throws ToolArgsError naming the misplaced or malformed argument.
+ * @throws Error naming the misplaced or malformed argument.
  */
 export function checkRenderArguments(args: OfficeRenderArgs, family: OfficeFamily): void {
   if (args.pages !== undefined) {
-    if (family === 'spreadsheet') throw new ToolArgsError(['pages does not apply to spreadsheets; select sheet and range instead'])
+    if (family === 'spreadsheet') throw new Error('pages does not apply to spreadsheets; select sheet and range instead')
     if (args.pages.length === 0 || args.pages.some(page => !Number.isSafeInteger(page) || page < 1)
       || new Set(args.pages).size !== args.pages.length) {
-      throw new ToolArgsError(['pages must list distinct one-based page numbers'])
+      throw new Error('pages must list distinct one-based page numbers')
     }
   }
-  if (family !== 'spreadsheet' && args.sheet !== undefined) throw new ToolArgsError(['sheet applies only to spreadsheets'])
-  if (args.range !== undefined && args.sheet === undefined) throw new ToolArgsError(['range requires sheet'])
-  if (args.sheet !== undefined && args.sheet.trim() === '') throw new ToolArgsError(['sheet must be an exact worksheet name'])
+  if (family !== 'spreadsheet' && args.sheet !== undefined) throw new Error('sheet applies only to spreadsheets')
+  if (args.range !== undefined && args.sheet === undefined) throw new Error('range requires sheet')
+  if (args.sheet !== undefined && args.sheet.trim() === '') throw new Error('sheet must be an exact worksheet name')
   if (args.dpi !== undefined && (!Number.isSafeInteger(args.dpi) || args.dpi < 24 || args.dpi > 600)) {
-    throw new ToolArgsError(['dpi must be an integer from 24 to 600'])
+    throw new Error('dpi must be an integer from 24 to 600')
   }
 }
 
@@ -133,13 +132,13 @@ export function checkRenderArguments(args: OfficeRenderArgs, family: OfficeFamil
  * Check conversion formats and worksheet selection against the input family.
  * @param args - schema-validated conversion arguments.
  * @param family - input family.
- * @throws ToolArgsError naming the formats available for this input.
+ * @throws Error naming the formats available for this input.
  */
 export function checkConversionArguments(args: OfficeConvertArgs, family: Exclude<OfficeFamily, 'pdf'>): void {
   const accepted = CONVERSION_OUTPUTS[family]
   if (!accepted.includes(args.format)) {
-    throw new ToolArgsError([`cannot convert "${args.input}" to ${args.format}: this file converts to ${accepted.join(', ')}`])
+    throw new Error(`cannot convert "${args.input}" to ${args.format}: this file converts to ${accepted.join(', ')}`)
   }
-  if (args.sheet !== undefined && args.format !== 'csv') throw new ToolArgsError(['sheet applies only to CSV conversion'])
-  if (args.sheet !== undefined && args.sheet.trim() === '') throw new ToolArgsError(['sheet must be an exact worksheet name'])
+  if (args.sheet !== undefined && args.format !== 'csv') throw new Error('sheet applies only to CSV conversion')
+  if (args.sheet !== undefined && args.sheet.trim() === '') throw new Error('sheet must be an exact worksheet name')
 }

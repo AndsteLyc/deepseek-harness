@@ -2,8 +2,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import { createAssistantMessage, type LlmAttemptId } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, LlmAttemptId } from '@deepseek-ai/dsh-llm'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import {
   createScope, MutableSessionEventSource,
@@ -370,7 +369,7 @@ describe('Conversation registries', () => {
       time: 2,
       type: 'assistant/live-chunk',
       data: {
-        attemptId: brandString<LlmAttemptId>('frame-probe'),
+        attemptId: LlmAttemptId('frame-probe'),
         turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'a' },
       },
     })
@@ -379,7 +378,7 @@ describe('Conversation registries', () => {
       time: 3,
       type: 'assistant/live-chunk',
       data: {
-        attemptId: brandString<LlmAttemptId>('frame-probe'),
+        attemptId: LlmAttemptId('frame-probe'),
         turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'b' },
       },
     })
@@ -411,11 +410,11 @@ describe('Conversation registries', () => {
       time: 4,
       type: 'assistant/live-chunk',
       data: {
-        attemptId: brandString<LlmAttemptId>('frame-probe'),
+        attemptId: LlmAttemptId('frame-probe'),
         turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'c' },
       },
     })
-    source.settleAssistant(brandString<LlmAttemptId>('frame-probe'), {
+    source.settleAssistant(LlmAttemptId('frame-probe'), {
       type: 'event',
       event: {
         seq: SessionSeq(5),

@@ -15,7 +15,6 @@
     "src/default-directory.ts"
   ],
   "references": [
-    { "path": "../../util/brand" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/schemastery" },
     { "path": "../../core/session" },

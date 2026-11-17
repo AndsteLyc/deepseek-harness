@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import { Context } from '@deepseek-ai/cordis'
 import Lsp, {
   finalExtension,
   LspError,
-  type LspProviderId,
+  LspProviderId,
   type LspProvider,
   type LspProviderQuery,
   type LspQueryResult,
@@ -19,7 +18,7 @@ function makeProvider(
   const seen: LspProviderQuery[] = []
   const seenSignals: (AbortSignal | undefined)[] = []
   return {
-    id: brandString<LspProviderId>(id),
+    id: LspProviderId(id),
     extensionToLanguage,
     seen,
     seenSignals,
@@ -183,6 +182,6 @@ describe('Lsp registration', () => {
   })
 
   it('brands a provider id without altering the string', () => {
-    expect(brandString<LspProviderId>('ts')).toBe('ts')
+    expect(LspProviderId('ts')).toBe('ts')
   })
 })

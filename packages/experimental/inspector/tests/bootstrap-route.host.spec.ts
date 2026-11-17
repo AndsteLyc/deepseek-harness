@@ -3,7 +3,8 @@
 import { Context, FiberState } from '@deepseek-ai/cordis'
 import type { Message } from '@deepseek-ai/cordis'
 import type { IndexInjection, WebServer } from '@deepseek-ai/dsh-host-webserver'
-import { ConnectionAuthentication, HostConnectionService } from '@deepseek-ai/dsh-client-connection'
+import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
+import type { BrowserAuth } from '@deepseek-ai/dsh-client-connection/src/browser-auth.ts'
 import { setFlagsFromString } from 'node:v8'
 import { runInNewContext } from 'node:vm'
 import open from 'open'
@@ -67,8 +68,7 @@ describe('experimental Inspector Host bootstrap route', () => {
     const registerUpgrade = vi.fn<WebServer['registerUpgrade']>(() => () => {})
     context.provide('webServer', { register, registerUpgrade } as Pick<WebServer, 'register' | 'registerUpgrade'> as WebServer)
     context.provide('cmdlineArgs', { get: () => args })
-    new ConnectionAuthentication(context)
-    const connection = new HostConnectionService(context, [])
+    const connection = new HostConnectionService(context, [], {} as BrowserAuth)
     const api = connection.createSharedFetchHandler('/api')
     const messages: Message[] = []
     context.logger.exporter({ levels: { default: 3 }, export: (message) => { messages.push(message) } })

@@ -1,8 +1,7 @@
 /** Bounded source admission, shared content conversion, and caller-owned output delivery. */
 import { createHash } from 'node:crypto'
 import { OfficeKitError } from './errors.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { OfficeKitKey, OfficeKitGeneration } from './identity.ts'
+import { OfficeKitKey, type OfficeKitGeneration } from './identity.ts'
 import type {
   OfficeConversionFormat, OfficeImage, OfficeKitPriority, OfficeKitSource, OfficeRecalculationFormat,
 } from './types.ts'
@@ -264,7 +263,7 @@ export class ConversionQueue {
     if (input.bytes.byteLength > reserved) throw new OfficeKitError('input-too-large', 'The source exceeds its reserved read capacity.')
     const digest = createHash('sha256').update(job.request.extension).update('\0').update(job.operation).update('\0')
       .update(input.bytes).digest('hex')
-    const key = brandString<OfficeKitKey>(`${this.generation}:${digest}`)
+    const key = OfficeKitKey(`${this.generation}:${digest}`)
     const cached = this.ready.get(key)
     if (cached !== undefined) {
       this.ready.delete(key)

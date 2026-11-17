@@ -3,8 +3,7 @@
 import { performance } from 'node:perf_hooks'
 import { Context } from '@deepseek-ai/cordis'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import SessionStore, { SESSION_FORMAT_VERSION, type SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -37,7 +36,7 @@ async function seed(ctx: Context): Promise<void> {
   const inherited = syntheticHistory(WORKLOAD.childHistoryTurns)
   const catalog: SessionEvent[] = []
   for (let child = 0; child < WORKLOAD.children; child++) {
-    const id = brandString<SessionId>('bench-child-' + String(child))
+    const id = SessionId('bench-child-' + String(child))
     catalog.push({
       type: 'subagent/catalog', seq: SessionSeq(child), time: TIME_ZERO + child,
       data: { version: 0, childId: id, childCreatedAt: TIME_ZERO + child,

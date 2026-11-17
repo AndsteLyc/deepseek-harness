@@ -6,13 +6,12 @@ import SessionStore, {
   buildForkSeed,
   pluginRecordOf,
   Session,
-  type SessionId,
+  SessionId,
   SessionLogOffset,
   SessionSeq,
 } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { PluginRequestFixture } from './plugin-records.type-test.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 /** One user turn opening, so a record lands between model-visible events. */
 function openTurn(session: Session): void {
@@ -24,7 +23,7 @@ function openTurn(session: Session): void {
 
 describe('plugin records', () => {
   it('commits an ignorable record outside the model-visible surface', () => {
-    const session = Session.create(brandString<SessionId>('record'))
+    const session = Session.create(SessionId('record'))
     openTurn(session)
     const messages = session.deriveMessages()
     const nodes = session.surface.nodes
@@ -43,7 +42,7 @@ describe('plugin records', () => {
   })
 
   it('reads records back and leaves every other event unread', () => {
-    const session = Session.create(brandString<SessionId>('reader'))
+    const session = Session.create(SessionId('reader'))
     openTurn(session)
     appendPluginRecord(session, 'plugin:test.bridge/entry_1', ['a', 2])
 
@@ -56,7 +55,7 @@ describe('plugin records', () => {
   })
 
   it('snapshots an interface-typed request with readonly messages', () => {
-    const session = Session.create(brandString<SessionId>('typed-request'))
+    const session = Session.create(SessionId('typed-request'))
     const request: PluginRequestFixture = {
       config: { provider: 'fixture', model: 'fixture' },
       messages: [{ role: 'user', content: [{ type: 'text', text: 'Translate this fragment.' }] }],
@@ -92,7 +91,7 @@ describe('plugin records', () => {
     'plugin:test state',
     'turn/start',
   ])('rejects the record type %j without changing the log', (type) => {
-    const session = Session.create(brandString<SessionId>('grammar'))
+    const session = Session.create(SessionId('grammar'))
     const name: string = type
 
     expect(() => {
@@ -104,7 +103,7 @@ describe('plugin records', () => {
   })
 
   it('rejects data that is not losslessly JSON-serializable without changing the log', () => {
-    const session = Session.create(brandString<SessionId>('lossy'))
+    const session = Session.create(SessionId('lossy'))
 
     expect(() => appendPluginRecord(session, 'plugin:test/number', Number.NaN))
       .toThrow('plugin record "plugin:test/number" carries non-JSON-serializable data')
@@ -116,7 +115,7 @@ describe('plugin records', () => {
     await ctx.plugin(SessionStore)
     const warnings: string[] = []
     ctx.logger.warn = ((message: unknown) => { warnings.push(String(message)) }) as typeof ctx.logger.warn
-    const session = ctx.sessions.create(brandString<SessionId>('observed-record'))
+    const session = ctx.sessions.create(SessionId('observed-record'))
     const heard: SessionEvent[] = []
     ctx.on('session/event', (observed) => { appendPluginRecord(observed, 'plugin:test/echo', {}) })
     ctx.on('session/event', (_observed, event) => { heard.push(event) })
@@ -132,14 +131,14 @@ describe('plugin records', () => {
   })
 
   it('carries records through a snapshot restore, a storage reopen, and a fork', () => {
-    const session = Session.create(brandString<SessionId>('source'))
+    const session = Session.create(SessionId('source'))
     openTurn(session)
     appendPluginRecord(session, 'plugin:test/state', { count: 1 })
     const events = session.snapshotEvents()
 
-    const restored = Session.create(brandString<SessionId>('restored'), events)
-    const reopened = Session.fromRestore(brandString<SessionId>('source'), events, session.header, SessionLogOffset(0), 'shared-frozen')
-    const child = Session.create(brandString<SessionId>('child'), buildForkSeed(events, SessionSeq(2)))
+    const restored = Session.create(SessionId('restored'), events)
+    const reopened = Session.fromRestore(SessionId('source'), events, session.header, SessionLogOffset(0), 'shared-frozen')
+    const child = Session.create(SessionId('child'), buildForkSeed(events, SessionSeq(2)))
 
     for (const copy of [restored, reopened, child]) {
       expect(pluginRecordOf(copy.snapshotEvents()[2] as SessionEvent))

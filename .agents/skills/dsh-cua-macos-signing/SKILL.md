@@ -39,10 +39,10 @@ If an existing record is damaged or its keychain/certificate is missing, setup s
 
 ## Configure the source build
 
-Resolve the DSH home used by the developer (`DSH_HOME`, otherwise `~/.dsh`). Merge the two printed values into its `cordis.patch.yml`, targeting the entry that loads `@deepseek-ai/dsh-cua-macos`. The shipped entry ID is `cua-macos`:
+Resolve the DSH home used by the developer (`DSH_HOME`, otherwise `~/.dsh`). Merge the two printed values into its `cordis.patch.yml`, targeting the entry that loads `@deepseek-ai/dsh-experimental-cua-macos`. The shipped entry ID is `cua`:
 
 ```yaml
-- id: cua-macos
+- id: cua
   config:
     sourceSigning:
       identity: "<fingerprint printed by setup>"

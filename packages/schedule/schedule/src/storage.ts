@@ -2,9 +2,8 @@
 import { createHash } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { MessageId } from '@deepseek-ai/dsh-llm/types'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import { decodeScheduleRecord } from './domain.ts'
 import type { ScheduleDeliveryRecord, ScheduleId, ScheduleRecord, ScheduleTarget } from './types.ts'
@@ -24,10 +23,10 @@ const instantSchema = z.iso.datetime({ precision: 3 }).refine(value => !value.st
 })
 
 /** Identity of one delivered inbox message: non-empty, without surrounding whitespace. */
-const messageIdSchema = z.string().min(1).refine(value => value.trim() === value).transform(brandString<MessageId>)
+const messageIdSchema = z.string().min(1).refine(value => value.trim() === value).transform(MessageId)
 
 /** Non-empty saved Session identity. */
-const sessionIdSchema = z.string().min(1).transform(brandString<SessionId>)
+const sessionIdSchema = z.string().min(1).transform(SessionId)
 
 const deliveryReceiptSchema = z.object({
   scheduledAt: instantSchema,
@@ -57,7 +56,7 @@ const targetSchema = z.discriminatedUnion('kind', [
 
 /** Stable reservation for a task without a saved destination; reads never allocate or persist a Session. */
 function defaultSessionId(id: ScheduleId): SessionId {
-  return brandString<SessionId>(`session-schedule-${createHash('sha256').update(id).digest('hex')}`)
+  return SessionId(`session-schedule-${createHash('sha256').update(id).digest('hex')}`)
 }
 
 /**

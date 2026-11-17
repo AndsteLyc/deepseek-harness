@@ -16,7 +16,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import AgentPresets from '@deepseek-ai/dsh-agent-preset-registry'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import * as JsonlSessionPersistence from '../../../session/session-persistence-jsonl/src/index.ts'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -27,7 +27,6 @@ import { DomainFacility } from '../../../storage/storage-domain/src/index.ts'
 import { MemoryMediaPool, MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
 import ScheduleService from '../../../schedule/schedule/src/index.ts'
 import * as ToolSchedule from '../../../schedule/tool-schedule/src/index.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const contexts: Context[] = []
@@ -79,7 +78,7 @@ async function setupScheduleHost(): Promise<{ ctx: Context; parent: Agent; dispa
     textResponse('child done'),
   ]))
   const handle = await ctx.agents.create({
-    sessionId: brandString<SessionId>('parent'),
+    sessionId: SessionId('parent'),
     agentOptions: { provider: 'mock', model: 'mock' },
     setup: async (agentCtx: Context) => void await ctx.agentPresets.mount(agentCtx, 'coding'),
   })

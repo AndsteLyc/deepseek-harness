@@ -6,10 +6,9 @@
  * policy on the resources it resolves from the call's actual wire arguments.
  */
 import { Context } from '@deepseek-ai/cordis'
-import type { AttachmentId, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { AttachmentId, type ImageAttachmentRef } from '../../../attachment/attachment/src/index.ts'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { TypertGatewayService } from '@deepseek-ai/dsh-api-gateway'
 import RemoteAccessService from '@deepseek-ai/dsh-api-remote-access'
@@ -19,8 +18,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { ConnectionAuthentication } from '@deepseek-ai/dsh-client-connection'
 import { HostConnectionService } from '../../../client/connection/src/rpc-host.ts'
+import { BrowserAuth } from '../../../client/connection/src/browser-auth.ts'
+import { provideBrowserCredentials } from '../../../api/gateway/tests/browser-credentials.ts'
 import { createSessionTestController } from '../../../api/session-controller/tests/test-remote.ts'
 import { ForkRegistry } from '../src/host/fork-registry.ts'
 import { READ_ONLY_FORK_CEILING, type ForkShareState, type ViewerSessionMode } from '../src/host/fork-policy.ts'
@@ -28,9 +28,9 @@ import { createViewerAccessPolicy, readerWriteRefusal, type ViewerAccessFacts } 
 import { createViewerReadService } from '../src/host/viewer-read.ts'
 
 const actor = { providerId: 'fixture', tenantId: 'tenant', subjectId: 'viewer' }
-const source = brandString<SessionId>('source')
-const child = brandString<SessionId>('own-child')
-const privateSession = brandString<SessionId>('private-session')
+const source = SessionId('source')
+const child = SessionId('own-child')
+const privateSession = SessionId('private-session')
 
 function call(method: string, request: object) {
   return { op: 'call' as const, path: `/api/${method}`, body: {
@@ -54,8 +54,9 @@ async function harness(mode: ViewerSessionMode = 'write') {
   await ctx.plugin(TypertRegistry)
   await mountAgentLoopTestDependencies(ctx)
   const driver = await mountAgentLoopTestHarness(ctx)
-  new ConnectionAuthentication(ctx)
-  new HostConnectionService(ctx, [])
+  provideBrowserCredentials(ctx)
+  const auth = await BrowserAuth.create(ctx, ctx.credentials, 1)
+  new HostConnectionService(ctx, [], auth)
   // Provided on the root Context that also constructs the Session controller below, which re-reads
   // access from that Context's own fiber while a Gateway call runs.
   new RemoteAccessService(ctx)
@@ -69,7 +70,7 @@ async function harness(mode: ViewerSessionMode = 'write') {
   })
   const agents = await Promise.all([source, child, privateSession].map(id => driver.create(id, {}, { cwd: process.cwd() })))
   const privateAgent = agents[2]!
-  const image: ImageAttachmentRef = { attachmentId: brandString<AttachmentId>('private-image'),
+  const image: ImageAttachmentRef = { attachmentId: AttachmentId('private-image'),
     mediaType: 'image/png', bytes: 1, width: 1, height: 1 }
   privateAgent.session.append('user/message', createUserMessage({
     content: [{ type: 'image', attachment: image }], source: { kind: 'user' },

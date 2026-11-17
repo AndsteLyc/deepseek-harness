@@ -43,10 +43,6 @@ describe('dsh badge assembled snapshot', () => {
             },
           ],
           "error": {
-            "info": {
-              "code": "SKILL_NOT_FOUND",
-              "name": "SkillError",
-            },
             "message": "skill "dsh-badge" is unknown or no longer available",
           },
           "isError": true,

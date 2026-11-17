@@ -8,12 +8,8 @@
 
 import { McpLocalError } from './diagnostic.ts'
 
-/** A referenced credential has no configured value (`MCP_CREDENTIAL_NOT_FOUND`). */
-export class MissingTemplateValue extends McpLocalError {
-  constructor(message: string) {
-    super(message, 'MCP_CREDENTIAL_NOT_FOUND')
-  }
-}
+/** A referenced credential has no configured value. */
+export class MissingTemplateValue extends McpLocalError {}
 
 const TOKEN = /\$\{credential:([A-Za-z_][A-Za-z0-9_]*)\}/g
 

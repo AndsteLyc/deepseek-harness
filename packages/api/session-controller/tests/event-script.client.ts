@@ -1,6 +1,5 @@
-import { brandString } from '@deepseek-ai/dsh-brand'
 import {
-  type ToolCallId, createMessage, createToolResultMessage, createUserMessage,
+  ToolCallId, createMessage, createToolResultMessage, createUserMessage,
 } from '@deepseek-ai/dsh-llm'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 // Minimal SessionEvent builders for orchestration tests (shape mirrors what the
@@ -72,7 +71,7 @@ export const ev = {
         turn,
         step,
         message: createToolResultMessage({
-          callId: brandString<ToolCallId>(callId),
+          callId: ToolCallId(callId),
           content: text(body),
           isError: false,
         }),

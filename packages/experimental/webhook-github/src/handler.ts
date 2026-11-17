@@ -5,13 +5,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Webhooks } from '@octokit/webhooks'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { snapshotJsonValue } from '@deepseek-ai/dsh-util-values'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type {
+import {
   WebhookDeliveryId,
   WebhookSourceId,
-  VerifiedWebhookDelivery,
-} from '@deepseek-ai/dsh-webhook/types'
-import type {} from '@deepseek-ai/dsh-webhook'
+  type VerifiedWebhookDelivery,
+} from '@deepseek-ai/dsh-webhook'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { readBoundedUtf8Body, WebhookHttpError } from './body.ts'
 import type { GitHubJsonObject } from './types.ts'
@@ -108,8 +106,8 @@ export function createGitHubWebhookHandler(
       const payload = parsePayload(body)
       const delivery: VerifiedWebhookDelivery<'github'> = {
         kind: 'github',
-        source: brandString<WebhookSourceId>(config.source),
-        deliveryId: brandString<WebhookDeliveryId>(deliveryId),
+        source: WebhookSourceId(config.source),
+        deliveryId: WebhookDeliveryId(deliveryId),
         event: { name: eventName, payload },
         receivedAt: Date.now(),
       }

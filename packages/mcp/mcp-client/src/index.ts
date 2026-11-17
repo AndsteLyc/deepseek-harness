@@ -13,7 +13,7 @@
  * @module @deepseek-ai/dsh-mcp-client
  */
 
-import { Context, type Fiber } from '@deepseek-ai/cordis'
+import type { Context, Fiber } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -28,8 +28,6 @@ import type { McpConnectionStatusHandle } from './status.ts'
 import type {} from '@deepseek-ai/dsh-tools'
 
 export { createMcpToolDefinition } from './tools.ts'
-export { McpLocalError, McpToolError } from './diagnostic.ts'
-export type { McpLocalErrorCode, McpToolErrorCode } from './diagnostic.ts'
 export type { McpResult, McpToolDefinitionOptions } from './tools.ts'
 export type { ReconnectConfig, ResolvedReconnectPolicy } from './connection.ts'
 export type { McpConnectionStatusHandle } from './status.ts'
@@ -212,7 +210,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // Fiber and survives its reloads and final disposal.
   let status!: ReturnType<typeof registerStatusCell>
   ctx.effect(() => {
-    const owner = scopeOf(ctx) ?? ctx[Context.root]
+    const owner = scopeOf(ctx) ?? ctx.root
     let names = activeServerNames.get(owner)
     if (!names) {
       names = new Set()

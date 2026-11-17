@@ -34,7 +34,6 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-llm": "workspace:*",
-    "@deepseek-ai/dsh-error": "workspace:*",
     "@deepseek-ai/dsh-scope": "workspace:*"
   },
   "dependencies": {
@@ -44,7 +43,6 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-llm": "workspace:*",
-    "@deepseek-ai/dsh-error": "workspace:*",
     "@deepseek-ai/dsh-scope": "workspace:*"
   }
 }

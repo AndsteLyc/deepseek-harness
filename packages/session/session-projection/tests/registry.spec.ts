@@ -13,14 +13,13 @@ import { z } from 'zod'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
   Session,
-  type SessionId,
+  SessionId,
   SessionLogOffset,
   SessionSeq,
 } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
@@ -46,7 +45,7 @@ interface StableViewState {
 const marksViewSchema: z.ZodType<MarksView> = z.object({ marks: z.array(z.string()) })
 const RESTORE_HEADER: SessionHeader = {
   version: SESSION_FORMAT_VERSION,
-  id: brandString<SessionId>('projection-restore'),
+  id: SessionId('projection-restore'),
   createdAt: 0,
   isSeeded: false,
 }
@@ -164,7 +163,7 @@ describe('SessionProjectionRegistry drive', () => {
       { type: 'turn/start', seq: SessionSeq(0), time: 1, data: { turn: 1 } },
       { type: 'turn/end', seq: SessionSeq(1), time: 2, data: { turn: 1, reason: { kind: 'completed' } } },
     ]
-    const session = ctx.sessions.create(brandString<SessionId>('projection-cut'), {
+    const session = ctx.sessions.create(SessionId('projection-cut'), {
       seed: inherited,
       inheritedEventCount: SessionLogOffset(inherited.length),
       meta: { isSeeded: true },
@@ -180,9 +179,9 @@ describe('SessionProjectionRegistry drive', () => {
     )
     expect(restored.checkpoint['test/cut']?.val).toBe(inherited.length)
     const prepared = Session.create(
-      brandString<SessionId>('projection-cut-prepared'),
+      SessionId('projection-cut-prepared'),
       inherited,
-      { ...session.header, id: brandString<SessionId>('projection-cut-prepared') },
+      { ...session.header, id: SessionId('projection-cut-prepared') },
       session.inheritedEventCount,
     )
     expect(ctx.sessionProjections.hydrate(
@@ -624,7 +623,7 @@ describe('SessionProjectionRegistry drive', () => {
       snapshot: { asOfSeq: after.seq, values: {} },
       checkpoint: { 'test/count': { ver: 1, seq: after.seq, val: 2 } },
     })
-    const prepared = ctx.sessions.prepare(brandString<SessionId>('projection-hydrate-released'), { seed: events })
+    const prepared = ctx.sessions.prepare(SessionId('projection-hydrate-released'), { seed: events })
     const hydrated = ctx.sessionProjections.hydrate(prepared, rows, events, SessionLogOffset(0))
     expect(hydrated).toEqual({ asOfSeq: after.seq, values: {} })
     expect(ctx.sessionProjections.hydrate(prepared, rows, events, SessionLogOffset(0))).toEqual(hydrated)
@@ -967,7 +966,7 @@ describe('SessionProjectionRegistry drive', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     const stable = await ctx.sessionProjections.register(stableViewUnit(state => state.value))
-    const session = ctx.sessions.prepare(brandString<SessionId>('projection-early-cell'))
+    const session = ctx.sessions.prepare(SessionId('projection-early-cell'))
     const before = stable.stateOf(session)
     const detach = ctx.sessions.enter(session)
     onTestFinished(detach)
@@ -994,7 +993,7 @@ describe('SessionProjectionRegistry drive', () => {
   it('hydrate with an empty event list serves the cut before baseSeq', async () => {
     const { ctx } = await harness()
     const marks = await ctx.sessionProjections.register(marksUnit())
-    const prepared = ctx.sessions.prepare(brandString<SessionId>('projection-hydrate-empty'))
+    const prepared = ctx.sessions.prepare(SessionId('projection-hydrate-empty'))
     const hydrated = ctx.sessionProjections.hydrate(prepared, {}, [], SessionLogOffset(0))
     expect(hydrated).toEqual({ asOfSeq: -1, values: { 'test/marks': { marks: [] } } })
     expect(marks.stateOf(prepared)).toBeNull()
@@ -1008,7 +1007,7 @@ describe('SessionProjectionRegistry drive', () => {
       { type: 'test/mark', seq: SessionSeq(0), time: 0, data: { marks: ['seed'] } },
       { type: 'turn/start', seq: SessionSeq(1), time: 1, data: { turn: 1 } },
     ]
-    const prepared = ctx.sessions.prepare(brandString<SessionId>('projection-hydrate-twice'), { seed: events })
+    const prepared = ctx.sessions.prepare(SessionId('projection-hydrate-twice'), { seed: events })
     const first = ctx.sessionProjections.hydrate(prepared, {}, events, SessionLogOffset(0))
     const restore = vi.spyOn(ctx.sessionProjections, 'restore')
     const second = ctx.sessionProjections.hydrate(prepared, {}, events, SessionLogOffset(0))
@@ -1024,7 +1023,7 @@ describe('SessionProjectionRegistry drive', () => {
       { type: 'test/mark', seq: SessionSeq(0), time: 0, data: { marks: ['first'] } },
       { type: 'test/mark', seq: SessionSeq(1), time: 1, data: { marks: ['second'] } },
     ]
-    const prepared = ctx.sessions.prepare(brandString<SessionId>('projection-hydrate-behind'), { seed: events })
+    const prepared = ctx.sessions.prepare(SessionId('projection-hydrate-behind'), { seed: events })
     expect(marks.stateOf(prepared)).toEqual({ marks: ['second'] })
     const hydrated = ctx.sessionProjections.hydrate(prepared, {}, events.slice(0, 1), SessionLogOffset(0))
     expect(hydrated).toEqual({ asOfSeq: 0, values: { 'test/marks': { marks: ['first'] } } })

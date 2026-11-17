@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import LlmRuntime, { createToolResultMessage, createUserMessage, type ToolCallId, type ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createToolResultMessage, createUserMessage, ToolCallId, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { Message, ToolSchema } from '@deepseek-ai/dsh-llm'
 import * as LlmPiAi from '@deepseek-ai/dsh-llm-pi-ai'
 import type { PiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
@@ -80,7 +79,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-pi-ai e2e (real API)', () =>
     const ctx = await harness(FLASH)
     const result = await assemble(ctx,{
       model: FLASH,
-      reasoningEffort: brandString<ReasoningEffortId>('off'),
+      reasoningEffort: ReasoningEffortId('off'),
       messages: ask('Reply with exactly the word: pong'),
       maxTokens: 50,
     })
@@ -93,7 +92,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-pi-ai e2e (real API)', () =>
     const ctx = await harness(FLASH)
     const result = await assemble(ctx,{
       model: FLASH,
-      reasoningEffort: brandString<ReasoningEffortId>('high'),
+      reasoningEffort: ReasoningEffortId('high'),
       messages: ask('Which is larger, 9.11 or 9.8? Answer with just the number.'),
       maxTokens: 2000,
     })
@@ -107,7 +106,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-pi-ai e2e (real API)', () =>
 
     const first = await assemble(ctx,{
       model: FLASH,
-      reasoningEffort: brandString<ReasoningEffortId>('max'),
+      reasoningEffort: ReasoningEffortId('max'),
       messages: ask('What is the weather in Paris right now? Use the get_weather tool.'),
       tools: [weatherTool],
       maxTokens: 2000,
@@ -123,12 +122,12 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-pi-ai e2e (real API)', () =>
 
     const second = await assemble(ctx,{
       model: FLASH,
-      reasoningEffort: brandString<ReasoningEffortId>('max'),
+      reasoningEffort: ReasoningEffortId('max'),
       messages: [
         ...ask('What is the weather in Paris right now? Use the get_weather tool.'),
         first.message,
         createToolResultMessage({
-          callId: brandString<ToolCallId>(call!.id),
+          callId: ToolCallId(call!.id),
           content: [{ type: 'text', text: 'Sunny, 22°C' }],
           isError: false,
         }),

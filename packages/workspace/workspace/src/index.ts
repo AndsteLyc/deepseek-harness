@@ -6,7 +6,6 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import { mkdir, stat } from 'node:fs/promises'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
@@ -538,7 +537,7 @@ export class WorkspaceRegistry extends Service {
     const workspaceName = title ?? defaultWorkspaceTitle(canonical)
     const table = this.requireTable()
     const state = this.requireState()
-    const id = brandString<WorkspaceId>(randomUUID())
+    const id = WorkspaceId(randomUUID())
     const now = new Date().toISOString()
     const record: WorkspaceRecord = {
       path: canonical,
@@ -702,7 +701,7 @@ export class WorkspaceRegistry extends Service {
           .map(header => header.id)
           .filter(sessionId => !accounted.has(sessionId))
         if (sessionIds.length === 0) continue
-        id = brandString<WorkspaceId>(randomUUID())
+        id = WorkspaceId(randomUUID())
         const createdAt = new Date(group.newestAt).toISOString()
         const record: WorkspaceRecord = {
           path: group.path,

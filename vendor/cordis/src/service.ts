@@ -1,6 +1,5 @@
-import { defineProperty, isNullable } from '@deepseek-ai/cosmokit'
+import { defineProperty } from '@deepseek-ai/cosmokit'
 import { Context } from './context.ts'
-import { locate } from './reflect.ts'
 import { createCallable, joinPrototype, symbols, type Tracker } from './utils.ts'
 
 /**
@@ -14,20 +13,18 @@ export abstract class Service<out T = never> {
   static readonly init: unique symbol = symbols.init
   /** Symbol key of the availability predicate passed to `ctx.provide()`. */
   static readonly check: unique symbol = symbols.check
+  /** Symbol key of the phantom intercept-config type parameter. */
+  static readonly config: unique symbol = symbols.config
   /** Symbol key of the call body making a service callable (e.g. `ctx.logger()`). */
   static readonly invoke: unique symbol = symbols.invoke
-  /** Symbol key of the phantom intercept-metadata type parameter. */
-  static readonly metadata: unique symbol = symbols.metadata
   /** Symbol key of the helper deriving an extended service instance. */
   static readonly extend: unique symbol = symbols.extend
   /** Symbol key of the tracker metadata used for context tracing. */
   static readonly tracker: unique symbol = symbols.tracker
-  /** Symbol key of the intercept-metadata merge hook below. */
-  static readonly mergeIntercept: unique symbol = symbols.mergeIntercept
-  /** Symbol key of the intercept-metadata resolution helper below. */
-  static readonly resolveIntercept: unique symbol = symbols.resolveIntercept
+  /** Symbol key of the intercept-config resolution helper below. */
+  static readonly resolveConfig: unique symbol = symbols.resolveConfig
 
-  declare [symbols.metadata]: T
+  declare [symbols.config]: T
 
   /** The service name this instance is registered under. */
   public name!: string
@@ -76,39 +73,32 @@ export abstract class Service<out T = never> {
   }
 
   /**
-   * Merge intercept metadata values, lowest precedence first.
+   * Merge intercept config from ancestors with optional base and head values.
    *
-   * Override to customize merging; the default is a shallow `Object.assign`.
+   * Entries added closer to the root apply first; `base` is prepended and
+   * `head` appended. Uses `Config.merge` when the service declares one,
+   * otherwise a shallow `Object.assign`.
    *
-   * @param values — the metadata values in increasing precedence.
-   * @returns the merged metadata.
+   * @param base — lowest-precedence config merged before all intercepts.
+   * @param head — highest-precedence config merged after all intercepts.
+   * @returns the merged config.
    */
-  [symbols.mergeIntercept](...values: T[]): T {
-    return Object.assign({}, ...values)
-  }
-
-  /**
-   * Resolve the intercept metadata visible to the current caller.
-   *
-   * The metadata injected by the fiber that admits the access applies first,
-   * then intercepts added by ancestor contexts, closest to the root first.
-   * The values are combined with `[Service.mergeIntercept]`.
-   *
-   * @returns the merged metadata.
-   */
-  [symbols.resolveIntercept](): T {
-    const values: T[] = []
+  [symbols.resolveConfig](base?: T, head?: T): T {
     let intercept = this.ctx[Context.intercept]
+    const configs: any[] = []
     while (this.name in intercept) {
       if (Object.hasOwn(intercept, this.name)) {
-        values.unshift(intercept[this.name])
+        configs.unshift(intercept[this.name])
       }
       intercept = Object.getPrototypeOf(intercept)
     }
-    const value = locate((this as any)[symbols.caller] ?? this.ctx, this.name)?.fiber?.inject[this.name]
-    if (!isNullable(value)) values.unshift(value)
-    const merge = this[symbols.mergeIntercept] ?? Service.prototype[symbols.mergeIntercept]
-    return merge.apply(this, values)
+    if (base) configs.unshift(base)
+    if (head) configs.push(head)
+    if (this['Config']?.merge) {
+      return this['Config'].merge(...configs)
+    } else {
+      return Object.assign({}, ...configs)
+    }
   }
 
   static [Symbol.hasInstance](instance: any) {

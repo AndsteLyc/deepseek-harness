@@ -7,7 +7,8 @@
 
 import { assertNever, deepFreeze, snapshotJsonValue } from '@deepseek-ai/dsh-util-values'
 import { BlockAssembler } from './assembler.ts'
-import type { ContentBlock, StreamChunk, ToolCallId } from './types.ts'
+import type { ToolCallId } from './brand.ts'
+import type { ContentBlock, StreamChunk } from './types.ts'
 
 /** One model chunk paired with its original Session timestamp. */
 export interface TimedStreamChunk {

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-/** Theme plugin owns DPR presentation; compiled module resources own CSS installation. */
+/** Dynamic ui-theme entry owns the global styles in dependency order. */
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installThemeStyles } from '../src/client/styles.ts'
 
+const PLUGIN_ID = '@deepseek-ai/dsh-client-ui-theme'
 const HAIRLINE_WIDTH = '--dsh-hairline-width'
 const contexts = new Set<Context>()
 let previousWidth: string
@@ -17,6 +18,7 @@ beforeEach(() => {
 afterEach(async () => {
   for (const ctx of contexts) await ctx.fiber.dispose()
   contexts.clear()
+  document.head.querySelectorAll(`style[data-plugin="${PLUGIN_ID}"]`).forEach((node) => { node.remove() })
   if (previousWidth === '') document.documentElement.style.removeProperty(HAIRLINE_WIDTH)
   else document.documentElement.style.setProperty(HAIRLINE_WIDTH, previousWidth, previousPriority)
   vi.restoreAllMocks()
@@ -32,12 +34,22 @@ async function mountStyles() {
 }
 
 describe('ui-theme client styles', () => {
-  it('leaves stylesheet installation to module resources and restores DPR on plugin disposal', async () => {
-    const before = document.querySelectorAll('style, link[rel="stylesheet"]').length
+  it('mounts every global sheet in dependency order and removes them on dispose', async () => {
     const fiber = await mountStyles()
-    expect(document.querySelectorAll('style, link[rel="stylesheet"]')).toHaveLength(before)
-    expect(document.documentElement.style.getPropertyValue(HAIRLINE_WIDTH)).not.toBe('')
+
+    const styles = [...document.head.querySelectorAll<HTMLStyleElement>(`style[data-plugin="${PLUGIN_ID}"]`)]
+    expect(styles.map(style => style.dataset.pluginCss)).toEqual([
+      `${PLUGIN_ID}/base.css`,
+      `${PLUGIN_ID}/corner-shape.css`,
+      `${PLUGIN_ID}/design-platform.css`,
+      `${PLUGIN_ID}/focus.css`,
+      `${PLUGIN_ID}/onboarding.css`,
+      `${PLUGIN_ID}/scrollbar.css`,
+      `${PLUGIN_ID}/gradient-shadow-text.css`,
+      `${PLUGIN_ID}/shiki.css`,
+    ])
     await fiber.dispose()
+    expect(document.head.querySelectorAll(`style[data-plugin="${PLUGIN_ID}"]`)).toHaveLength(0)
     expect(document.documentElement.style.getPropertyValue(HAIRLINE_WIDTH)).toBe(previousWidth)
   })
 
@@ -48,15 +60,16 @@ describe('ui-theme client styles', () => {
     expect(document.documentElement.style.getPropertyValue(HAIRLINE_WIDTH)).toBe('0.5px')
   })
 
-  it('acquires no styles or DPR presentation for a detached document', async () => {
+  it('mounts and releases styles without publishing a DPR width for a detached document', async () => {
     const detached = document.implementation.createHTMLDocument('')
     vi.stubGlobal('document', detached)
     try {
       const fiber = await mountStyles()
       expect(detached.defaultView).toBeNull()
-      expect(detached.querySelectorAll('style, link[rel="stylesheet"]')).toHaveLength(0)
+      expect(detached.head.querySelectorAll(`style[data-plugin="${PLUGIN_ID}"]`)).toHaveLength(8)
       expect(detached.documentElement.style.getPropertyValue(HAIRLINE_WIDTH)).toBe('')
       await fiber.dispose()
+      expect(detached.head.querySelectorAll(`style[data-plugin="${PLUGIN_ID}"]`)).toHaveLength(0)
     } finally {
       vi.unstubAllGlobals()
     }
@@ -71,6 +84,7 @@ describe('ui-theme client styles', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+    expect(document.head.querySelectorAll(`style[data-plugin="${PLUGIN_ID}"]`)).toHaveLength(0)
     expect(document.documentElement.style.getPropertyValue(HAIRLINE_WIDTH)).toBe(previousWidth)
   })
 

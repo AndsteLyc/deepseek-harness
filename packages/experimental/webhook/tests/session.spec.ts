@@ -1,13 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AgentOptions } from '@deepseek-ai/dsh-agent'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type {
+import {
   WebhookDeliveryId,
   WebhookRuleId,
   WebhookSourceId,
-  VerifiedWebhookDelivery,
-  WebhookSessionRequest,
+  type VerifiedWebhookDelivery,
+  type WebhookSessionRequest,
 } from '../src/index.ts'
 import { createWebhookSession } from '../src/session.ts'
 
@@ -158,8 +157,8 @@ function harness(options: HarnessOptions = {}): SessionHarness {
 
 const delivery: VerifiedWebhookDelivery = {
   kind: 'github',
-  source: brandString<WebhookSourceId>('primary'),
-  deliveryId: brandString<WebhookDeliveryId>('delivery'),
+  source: WebhookSourceId('primary'),
+  deliveryId: WebhookDeliveryId('delivery'),
   event: { action: 'ready_for_review' },
   receivedAt: 1,
 }
@@ -168,7 +167,7 @@ async function create(test: SessionHarness, request = test.request): Promise<voi
   await createWebhookSession(
     test.ctx,
     delivery,
-    brandString<WebhookRuleId>('review'),
+    WebhookRuleId('review'),
     request,
     test.controller.signal,
   )

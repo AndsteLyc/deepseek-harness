@@ -1,11 +1,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import WebhookRuntime, {
-  type WebhookDeliveryId,
-  type WebhookRuleId,
-  type WebhookSourceId,
+  WebhookDeliveryId,
+  WebhookRuleId,
+  WebhookSourceId,
   type VerifiedWebhookDelivery,
 } from '../src/index.ts'
 
@@ -26,8 +25,8 @@ function harness(): { ctx: Context; runtime: WebhookRuntime } {
 function delivery(id = 'delivery-1'): VerifiedWebhookDelivery<'fixture'> {
   return {
     kind: 'fixture',
-    source: brandString<WebhookSourceId>('fixture-source'),
-    deliveryId: brandString<WebhookDeliveryId>(id),
+    source: WebhookSourceId('fixture-source'),
+    deliveryId: WebhookDeliveryId(id),
     event: { value: 1 },
     receivedAt: 1,
   }
@@ -39,7 +38,7 @@ describe('WebhookRuntime', () => {
     const entered = Promise.withResolvers<Readonly<VerifiedWebhookDelivery<'fixture'>>>()
     const release = Promise.withResolvers<boolean>()
     runtime.register({
-      id: brandString<WebhookRuleId>('fixture-rule'),
+      id: WebhookRuleId('fixture-rule'),
       kind: 'fixture',
       async run(input) {
         entered.resolve(input)
@@ -64,7 +63,7 @@ describe('WebhookRuntime', () => {
     const both = Promise.withResolvers<boolean>()
     const maybeDone = (): void => { if (started.length === 2) both.resolve(true) }
     runtime.register({
-      id: brandString<WebhookRuleId>('throws'),
+      id: WebhookRuleId('throws'),
       kind: 'fixture',
       run() {
         started.push('throws')
@@ -73,7 +72,7 @@ describe('WebhookRuntime', () => {
       },
     })
     runtime.register({
-      id: brandString<WebhookRuleId>('succeeds'),
+      id: WebhookRuleId('succeeds'),
       kind: 'fixture',
       run() {
         started.push('succeeds')
@@ -82,7 +81,7 @@ describe('WebhookRuntime', () => {
       },
     })
     runtime.register({
-      id: brandString<WebhookRuleId>('other-kind'),
+      id: WebhookRuleId('other-kind'),
       kind: 'other',
       run: vi.fn(() => null),
     })
@@ -93,17 +92,17 @@ describe('WebhookRuntime', () => {
 
   it('rejects malformed registrations and duplicate ids', async () => {
     const { runtime } = harness()
-    expect(() => runtime.register({ id: brandString<WebhookRuleId>(''), kind: 'fixture', run: () => null }))
+    expect(() => runtime.register({ id: WebhookRuleId(''), kind: 'fixture', run: () => null }))
       .toThrow(/id must be a non-empty string/)
-    expect(() => runtime.register({ id: brandString<WebhookRuleId>('bad-kind'), kind: '', run: () => null }))
+    expect(() => runtime.register({ id: WebhookRuleId('bad-kind'), kind: '', run: () => null }))
       .toThrow(/kind must be a non-empty string/)
-    expect(() => runtime.register({ id: brandString<WebhookRuleId>('bad-run'), kind: 'fixture', run: 1 as never }))
+    expect(() => runtime.register({ id: WebhookRuleId('bad-run'), kind: 'fixture', run: 1 as never }))
       .toThrow(/requires run/)
-    const dispose = runtime.register({ id: brandString<WebhookRuleId>('same'), kind: 'fixture', run: () => null })
-    expect(() => runtime.register({ id: brandString<WebhookRuleId>('same'), kind: 'fixture', run: () => null }))
+    const dispose = runtime.register({ id: WebhookRuleId('same'), kind: 'fixture', run: () => null })
+    expect(() => runtime.register({ id: WebhookRuleId('same'), kind: 'fixture', run: () => null }))
       .toThrow(/already registered/)
     await dispose()
-    expect(() => runtime.register({ id: brandString<WebhookRuleId>('same'), kind: 'fixture', run: () => null }))
+    expect(() => runtime.register({ id: WebhookRuleId('same'), kind: 'fixture', run: () => null }))
       .not.toThrow()
   })
 
@@ -114,7 +113,7 @@ describe('WebhookRuntime', () => {
     const finished = Promise.withResolvers<boolean>()
     let calls = 0
     const dispose = runtime.register({
-      id: brandString<WebhookRuleId>('draining'),
+      id: WebhookRuleId('draining'),
       kind: 'fixture',
       async run(_input, signal) {
         calls++
@@ -142,7 +141,7 @@ describe('WebhookRuntime', () => {
     const { ctx, runtime } = harness()
     const entered = Promise.withResolvers<AbortSignal>()
     runtime.register({
-      id: brandString<WebhookRuleId>('runtime-disposal'),
+      id: WebhookRuleId('runtime-disposal'),
       kind: 'fixture',
       async run(_input, signal) {
         entered.resolve(signal)
@@ -157,14 +156,14 @@ describe('WebhookRuntime', () => {
     await ctx.fiber.dispose()
     expect(signal.aborted).toBe(true)
     expect(() => { runtime.dispatch(delivery()) }).toThrow(/closing/)
-    expect(() => runtime.register({ id: brandString<WebhookRuleId>('late'), kind: 'fixture', run: () => null }))
+    expect(() => runtime.register({ id: WebhookRuleId('late'), kind: 'fixture', run: () => null }))
       .toThrow(/closing/)
   })
 
   it.each([
     [{ ...delivery(), kind: '' }, /kind/],
-    [{ ...delivery(), source: brandString<WebhookSourceId>('') }, /source/],
-    [{ ...delivery(), deliveryId: brandString<WebhookDeliveryId>('') }, /delivery id/],
+    [{ ...delivery(), source: WebhookSourceId('') }, /source/],
+    [{ ...delivery(), deliveryId: WebhookDeliveryId('') }, /delivery id/],
     [{ ...delivery(), receivedAt: -1 }, /receivedAt/],
     [{ ...delivery(), event: { invalid: undefined } }, /lossless JSON/],
   ] as const)('rejects malformed deliveries synchronously', (input, message) => {
@@ -177,7 +176,7 @@ describe('WebhookRuntime', () => {
     const calledTwice = Promise.withResolvers<boolean>()
     let calls = 0
     runtime.register({
-      id: brandString<WebhookRuleId>('repeat'),
+      id: WebhookRuleId('repeat'),
       kind: 'fixture',
       run() {
         calls++
@@ -259,7 +258,7 @@ describe('WebhookRuntime', () => {
     } as never)
     const runtime = new WebhookRuntime(ctx)
     runtime.register({
-      id: brandString<WebhookRuleId>('creates'),
+      id: WebhookRuleId('creates'),
       kind: 'fixture',
       run: () => ({
         workspacePath: '/workspace',

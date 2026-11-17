@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DesktopHostProcess } from '../src/host-process.ts'
 import { desktopClientMetadata } from '../src/client-metadata.ts'
 import { connectDesktopWelcome, type DesktopWelcomeBackend } from '../src/welcome-backend.ts'
+import { authenticateWebHost } from '../src/web-document.ts'
 import { builtHost, prepareDesktopHome } from './harness.ts'
 
 afterEach(() => { vi.unstubAllEnvs() })
@@ -89,9 +90,9 @@ describe.skipIf(!existsSync(builtHost))('built Desktop welcome flow', () => {
         await host?.stop()
         host = new DesktopHostProcess(process.execPath, project, paths.profile, undefined,
           process.env, undefined, join(root, 'runtime', 'primary-runtime'))
-        const { url, authenticationCookie } = await host.start()
+        const { url } = await host.start()
         hostOrigin = new URL(url).origin
-        backend = connectDesktopWelcome(url, authenticationCookie)
+        backend = connectDesktopWelcome(url, await authenticateWebHost(url))
       }
       const status = async () => backend.read()
       const fingerprint = (): string => createHash('sha256')

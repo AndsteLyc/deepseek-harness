@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
 /** The comparison store: served and missing comparisons stay, failures retry, resets and disposal forget. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { changesDiffUrl, type ChangesDiff } from '../src/changes.ts'
 import { ChangesDiffStore } from '../src/client/changes-diff.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 afterEach(() => { vi.unstubAllGlobals() })
 
-const SESSION = brandString<SessionId>('viewed')
+const SESSION = SessionId('viewed')
 const URL_ = changesDiffUrl(SESSION, 5, 1)
 const text: ChangesDiff = {
   kind: 'text', path: 'a.ts', display: 'a.ts', before: true, after: true, coarse: false,

@@ -34,9 +34,6 @@
     },
     {
       "path": "../../workflow/workflow"
-    },
-    {
-      "path": "../../util/error"
     }
   ]
 }

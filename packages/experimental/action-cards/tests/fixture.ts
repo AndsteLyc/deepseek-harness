@@ -2,9 +2,8 @@
 import { Context } from '@deepseek-ai/cordis'
 import { onTestFinished, vi } from 'vitest'
 import { z } from 'zod'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import { createToolResultMessage, type ToolCallId } from '@deepseek-ai/dsh-llm'
-import type { SessionId, SessionEvent } from '@deepseek-ai/dsh-session'
+import { createToolResultMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
+import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import Skills, { BUNDLED_SKILL_RANK } from '@deepseek-ai/dsh-skill'
 import * as SkillTool from '@deepseek-ai/dsh-tool-skill'
@@ -16,7 +15,7 @@ import type { ActionCardFields, ActionCardKind, ActionCardProposalOf, ActionCard
 export const ACTION = 'test_action'
 export const SKILL = 'test-skill'
 export const INVITATION = 'Invite the user to try the card in one sentence.'
-export const callId = brandString<ToolCallId>('call-card-1')
+export const callId = ToolCallId('call-card-1')
 export const proposal = { action: ACTION, title: 'Counter', brief: 'Keep a counter visible.', details: { value: 'a' } }
 
 /** Details of the test kind. */
@@ -58,7 +57,7 @@ export async function fixture(kind: Partial<ActionCardKind<TestDetails>> = {}) {
       act, ...kind,
     })
   } })
-  const agentHandle = await ctx.agents.create({ sessionId: brandString<SessionId>('cards-root') })
+  const agentHandle = await ctx.agents.create({ sessionId: SessionId('cards-root') })
   const agent = agentHandle.agent
   const events: SessionEvent[] = []
   ctx.on('session/event', (session, event) => { if (session === agent.session) events.push(event) })

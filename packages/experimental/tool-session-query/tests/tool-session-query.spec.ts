@@ -3,15 +3,14 @@ import { executeToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context, type Fiber } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
-import { createUserMessage, type ToolCallId, HarnessError , createMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId, HarnessError , createMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
 import { MAX_TIMER_DELAY_MS, TimeoutReason } from '@deepseek-ai/dsh-timeout'
 import * as TimeoutPolicy from '@deepseek-ai/dsh-tool-call-timeout-policy'
 import SessionStore, {
   SESSION_FORMAT_VERSION,
-  type SessionId,
+  SessionId,
   SessionSeq,
   type Session,
   type SessionEvent,
@@ -21,7 +20,7 @@ import SessionStore, {
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SessionQueryEngine, {
   SessionQueryError,
-  type SessionSearchCursor,
+  SessionSearchCursor,
   type SessionEventSearchHit,
   type SessionEventSearchPage,
   type SessionEventSearchRequest,
@@ -55,7 +54,7 @@ afterEach(async () => {
 function header(id: string, cwd: string | undefined, createdAt = 1, parentSession?: SessionIdValue): SessionHeader {
   return {
     version: SESSION_FORMAT_VERSION,
-    id: brandString<SessionId>(id),
+    id: SessionId(id),
     createdAt,
     isSeeded: false,
     ...cwd === undefined ? {} : { cwd },
@@ -70,7 +69,7 @@ function createSession(
   createdAt = 1,
   parentSession?: SessionIdValue,
 ): Session {
-  return ctx.sessions.create(brandString<SessionId>(id), {
+  return ctx.sessions.create(SessionId(id), {
     meta: {
       createdAt,
       ...cwd === undefined ? {} : { cwd },
@@ -106,7 +105,7 @@ function sessionHit(
     live: true,
     persisted: false,
     bestMatch: {
-      sessionId: brandString<SessionId>(id),
+      sessionId: SessionId(id),
       seq: SessionSeq(4),
       type: 'assistant/message',
       time: 200,
@@ -241,7 +240,7 @@ async function mount(
     call: (toolName, args, options = {}) => executeToolFixture(ctx, {
       name: toolName,
       arguments: args,
-      callId: brandString<ToolCallId>(`call-${++calls}`),
+      callId: ToolCallId(`call-${++calls}`),
       signal: options.signal ?? new AbortController().signal,
       ...options.agent === undefined ? { agent: fakeAgent(caller) } : { agent: options.agent },
     }),
@@ -325,7 +324,7 @@ describe('registration and schemas', () => {
       expect(new ToolExecutionPipeline(mounted.ctx, { get: (name, scope) => mounted.ctx.tools.get(name, scope) }).executionMode({
         name,
         arguments: args,
-        callId: brandString<ToolCallId>(`mode-${name}`),
+        callId: ToolCallId(`mode-${name}`),
         signal: new AbortController().signal,
         agent,
       })).toEqual({ kind })
@@ -603,7 +602,7 @@ describe('workspace authority and lineage redaction', () => {
     const missing = await executeToolFixture(mounted.ctx, {
       name: 'session_trace',
       arguments: {},
-      callId: brandString<ToolCallId>('missing-agent'),
+      callId: ToolCallId('missing-agent'),
       signal: new AbortController().signal,
     })
     expect(errorCode(missing)).toBe('SESSION_QUERY_TOOL_MISSING_AGENT')
@@ -685,7 +684,7 @@ describe('workspace authority and lineage redaction', () => {
 
   it('rejects unrequested or unauthorized records returned during parent preauthorization', async () => {
     const mounted = await mount()
-    const requested = brandString<SessionId>('requested-parent')
+    const requested = SessionId('requested-parent')
     vi.spyOn(mounted.ctx.sessionQuery, 'filterSessions').mockResolvedValueOnce([
       { header: header('unrequested-parent', '/work'), live: true, persisted: false },
       { header: header(requested, '/outside'), live: true, persisted: false },
@@ -832,8 +831,8 @@ describe('workspace authority and lineage redaction', () => {
 
   it('sanitizes a real outside-workspace ancestor cycle before the lineage error reaches the model', async () => {
     const mounted = await mount()
-    const hiddenA = brandString<SessionId>('hidden-cycle-a-secret')
-    const hiddenB = brandString<SessionId>('hidden-cycle-b-secret')
+    const hiddenA = SessionId('hidden-cycle-a-secret')
+    const hiddenB = SessionId('hidden-cycle-b-secret')
     createSession(mounted.ctx, hiddenA, '/outside', 2, hiddenB)
     createSession(mounted.ctx, hiddenB, '/outside', 3, hiddenA)
     const target = createSession(mounted.ctx, 'visible-cycle-target', '/work', 4, hiddenA)
@@ -1062,11 +1061,11 @@ describe('workspace authority and lineage redaction', () => {
       values: [target.id],
     }])
     if (targetRecord === undefined) throw new Error('expected target record')
-    const firstId = brandString<SessionId>('branch-first')
-    const nestedId = brandString<SessionId>('branch-nested')
-    const hiddenId = brandString<SessionId>('branch-hidden-secret')
-    const hiddenDescendantId = brandString<SessionId>('branch-hidden-descendant-secret')
-    const lastId = brandString<SessionId>('branch-last')
+    const firstId = SessionId('branch-first')
+    const nestedId = SessionId('branch-nested')
+    const hiddenId = SessionId('branch-hidden-secret')
+    const hiddenDescendantId = SessionId('branch-hidden-descendant-secret')
+    const lastId = SessionId('branch-last')
     const descendants: SessionLineageNode[] = [
       {
         session: { ...targetRecord, header: header(firstId, '/work', 30) },
@@ -1124,7 +1123,7 @@ describe('workspace authority and lineage redaction', () => {
     const complete = text(await mounted.call('session_trace', { session_id: target.id }))
     expect(complete).toContain('visible-root')
 
-    const missingParent = brandString<SessionId>('missing-parent-secret')
+    const missingParent = SessionId('missing-parent-secret')
     const incomplete = createSession(mounted.ctx, 'incomplete-target', '/work', 7, missingParent)
     const redacted = text(await mounted.call('session_trace', { session_id: incomplete.id }))
     expect(redacted).toContain('[outside workspace boundary]')
@@ -1260,8 +1259,8 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
     const b = createSession(mounted.ctx, 'b', '/work')
     FakeQuery.titles.set(a.id, 'Alpha')
     FakeQuery.titles.set(b.id, 'Beta')
-    const c1 = brandString<SessionSearchCursor>('c1')
-    const c2 = brandString<SessionSearchCursor>('c2')
+    const c1 = SessionSearchCursor('c1')
+    const c2 = SessionSearchCursor('c2')
     FakeQuery.sessionSearch = (request) => {
       if (request.cursor === undefined) {
         return Promise.resolve({
@@ -1300,7 +1299,7 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
 
   it('does not report a cap when only rejected hits remain after the authorized limit', async () => {
     const mounted = await mount({ maxSearchResults: 1 })
-    const cursor = brandString<SessionSearchCursor>('rejected-tail')
+    const cursor = SessionSearchCursor('rejected-tail')
     FakeQuery.sessionSearch = request => request.cursor === undefined
       ? Promise.resolve({
         items: [sessionHit('authorized', '/work')],
@@ -1554,7 +1553,7 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
 
   it('preserves stale-cursor diagnostics without transparently restarting', async () => {
     const mounted = await mount({ maxSearchResults: 2 })
-    const cursor = brandString<SessionSearchCursor>('stale-next')
+    const cursor = SessionSearchCursor('stale-next')
     FakeQuery.sessionSearch = request => request.cursor === undefined
       ? Promise.resolve({ items: [], nextCursor: cursor })
       : Promise.reject(new SessionQueryError('stale provider generation', 'SESSION_QUERY_STALE_CURSOR'))
@@ -1566,7 +1565,7 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
 
   it('rejects a repeated internal cursor instead of looping', async () => {
     const mounted = await mount()
-    const cursor = brandString<SessionSearchCursor>('repeat')
+    const cursor = SessionSearchCursor('repeat')
     FakeQuery.sessionSearch = () => Promise.resolve({ items: [], nextCursor: cursor })
     const result = await mounted.call('session_search', { query: 'needle' })
     expect(errorCode(result)).toBe('SESSION_QUERY_INVALID_CURSOR')
@@ -1639,7 +1638,7 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
     expect(errorCode(missing)).toBe('SESSION_QUERY_INVALID_FILTER')
 
     const other = createSession(mounted.ctx, 'paged-events', '/work')
-    const cursor = brandString<SessionSearchCursor>('events-next')
+    const cursor = SessionSearchCursor('events-next')
     FakeQuery.eventSearch = request => request.cursor === undefined
       ? Promise.resolve({
         session: header(other.id, '/work'),
@@ -1673,7 +1672,7 @@ describe('search paging, prior-history bounds, titles, and cancellation', () => 
     const result = await executeToolFixture(ctx, {
       name: 'session_event_search',
       arguments: { query: 'q' },
-      callId: brandString<ToolCallId>('call-no-boundary'),
+      callId: ToolCallId('call-no-boundary'),
       signal: new AbortController().signal,
       agent: fakeAgent(session),
     })

@@ -1,9 +1,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { HarnessError } from '@deepseek-ai/dsh-error'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import AttachmentStore, {
-  AttachmentError, type AttachmentId, type ImageVariantId,
+  AttachmentError,
+  AttachmentId,
+  ImageVariantId,
   isAttachmentError,
   isImageAdmissionError,
   type ImageAttachmentRef,
@@ -41,7 +42,7 @@ class RecordingStore extends AttachmentStore {
     this.calls.push(`save:${value}`)
     if (value === this.rejectSaveAt) throw new Error(`write:${value}`)
     return {
-      attachmentId: brandString<AttachmentId>(`sha256:${String(value).padStart(64, '0')}`),
+      attachmentId: AttachmentId(`sha256:${String(value).padStart(64, '0')}`),
       mediaType: input.mediaType,
       bytes: input.data.byteLength,
       width: 1,
@@ -60,7 +61,7 @@ class RecordingStore extends AttachmentStore {
   ): Promise<RequestImageAttachment> {
     this.calls.push(`request:${ref.name}`)
     return Promise.resolve({
-      variantId: brandString<ImageVariantId>(`sha256:${String(ref.bytes).padStart(64, '0')}`),
+      variantId: ImageVariantId(`sha256:${String(ref.bytes).padStart(64, '0')}`),
       attachment: ref,
       data: Uint8Array.of(ref.bytes),
       mediaType: ref.mediaType,
@@ -96,7 +97,7 @@ class RecordingFileStore extends RecordingStore {
   override saveFile(input: SaveFileAttachment) {
     this.fileInput = input
     return Promise.resolve({
-      attachmentId: brandString<AttachmentId>(`sha256:${'cd'.repeat(32)}`),
+      attachmentId: AttachmentId(`sha256:${'cd'.repeat(32)}`),
       name: input.name ?? 'unnamed',
       bytes: input.data.byteLength,
     })
@@ -173,7 +174,7 @@ describe('AttachmentStore.readImageRequest', () => {
       name: 'notes.txt',
     })).rejects.toMatchObject({ code: 'ATTACHMENT_FILES_UNSUPPORTED' })
     const fileRef = {
-      attachmentId: brandString<AttachmentId>(`sha256:${'ab'.repeat(32)}`),
+      attachmentId: AttachmentId(`sha256:${'ab'.repeat(32)}`),
       name: 'notes.txt',
       bytes: 1,
     }

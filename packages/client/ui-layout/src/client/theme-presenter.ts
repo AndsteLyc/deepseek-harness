@@ -50,23 +50,11 @@ export class ThemePresenter {
   private appliedTokens: string[] = []
   /** The single metadata node this presenter inserts and removes. */
   private readonly themeColorMeta: HTMLMetaElement
-  private styleObserver: MutationObserver | undefined
 
   /** Create the presenter-owned metadata node before the first snapshot arrives. */
   constructor() {
     this.themeColorMeta = document.createElement('meta')
     this.themeColorMeta.name = 'theme-color'
-  }
-
-  /** Observe stylesheet installation and replacement after theme initialization. */
-  start(): void {
-    if (this.styleObserver !== undefined) return
-    this.styleObserver = new MutationObserver((changes) => {
-      const isStyle = (node: Node): boolean => node.nodeName === 'STYLE'
-      if (changes.some(change => isStyle(change.target) || change.target.parentNode?.nodeName === 'STYLE'
-        || [...change.addedNodes, ...change.removedNodes].some(isStyle))) this.refreshThemeColor()
-    })
-    this.styleObserver.observe(document.head, { childList: true, subtree: true, characterData: true })
   }
 
   /**
@@ -100,11 +88,7 @@ export class ThemePresenter {
       body.style.setProperty(name, value)
       this.appliedTokens.push(name)
     }
-    this.refreshThemeColor()
-  }
-
-  private refreshThemeColor(): void {
-    this.themeColorMeta.content = getComputedStyle(document.body).backgroundColor
+    this.themeColorMeta.content = getComputedStyle(body).backgroundColor
     if (!this.themeColorMeta.isConnected) document.head.append(this.themeColorMeta)
   }
 
@@ -113,8 +97,6 @@ export class ThemePresenter {
    * attribute, token variables, the font sizes, font lists, and the owned metadata node.
    */
   dispose(): void {
-    this.styleObserver?.disconnect()
-    this.styleObserver = undefined
     document.documentElement.style.removeProperty('color-scheme')
     document.documentElement.removeAttribute(THEME_SOURCE_ATTRIBUTE)
     const body = document.body

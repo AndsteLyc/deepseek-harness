@@ -7,13 +7,12 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { type SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import {
   SessionTelemetryCoordinator,
   type SessionTelemetrySink,
   type SessionTelemetryRecord,
 } from '../src/index.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 const FIXTURE_SECRET = 'sk-fixture1234567890'
 
@@ -40,7 +39,7 @@ async function setup() {
 describe('session-telemetry/record waterfall', () => {
   it('passes records through unchanged when no listener is mounted', async () => {
     const { ctx, backend } = await setup()
-    const session = ctx.sessions.create(brandString<SessionId>('w'))
+    const session = ctx.sessions.create(SessionId('w'))
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: `key ${FIXTURE_SECRET}` }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
@@ -54,7 +53,7 @@ describe('session-telemetry/record waterfall', () => {
       const record = next()
       return { ...record, body: { scrubbed: true } }
     })
-    const session = ctx.sessions.create(brandString<SessionId>('rule'))
+    const session = ctx.sessions.create(SessionId('rule'))
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: FIXTURE_SECRET }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
@@ -69,7 +68,7 @@ describe('session-telemetry/record waterfall', () => {
   it('keeps the canonical log untouched by a mounted rule', async () => {
     const { ctx } = await setup()
     ctx.on('session-telemetry/record', (_record, next) => ({ ...next(), body: null }))
-    const session = ctx.sessions.create(brandString<SessionId>('log'))
+    const session = ctx.sessions.create(SessionId('log'))
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: FIXTURE_SECRET }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
@@ -91,7 +90,7 @@ describe('session-telemetry/record waterfall', () => {
       const record = next()
       return { ...record, attributes: { ...record.attributes, inner: 1 } }
     })
-    const session = ctx.sessions.create(brandString<SessionId>('stack'))
+    const session = ctx.sessions.create(SessionId('stack'))
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
@@ -107,7 +106,7 @@ describe('session-telemetry/record waterfall', () => {
       inner.called = true
       return next()
     })
-    const session = ctx.sessions.create(brandString<SessionId>('veto'))
+    const session = ctx.sessions.create(SessionId('veto'))
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })
@@ -120,7 +119,7 @@ describe('session-telemetry/record waterfall', () => {
     ctx.on('session-telemetry/record', () => {
       throw new Error('rule exploded')
     })
-    const session = ctx.sessions.create(brandString<SessionId>('closed'))
+    const session = ctx.sessions.create(SessionId('closed'))
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' },
     }), { surfaceOp: 'append' })

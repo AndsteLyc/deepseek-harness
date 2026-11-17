@@ -34,8 +34,7 @@ import {
   type RemoteStreamOptions,
 } from './remote-stream.ts'
 
-export { isRemoteStreamCarrierFailure, RemoteStreamCarrierError } from './stream-client.ts'
-export type { RemoteStreamCarrierFailure } from './stream-client.ts'
+export { RemoteStreamCarrierError } from './stream-client.ts'
 export { RemoteJournalStream } from './journal-stream.ts'
 export type {
   RemoteJournalChange,

@@ -8,14 +8,13 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
-import type { AttachmentId } from '@deepseek-ai/dsh-attachment/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@deepseek-ai/dsh-agent-loop-testkit'
 import TypertGatewayService from '@deepseek-ai/dsh-api-gateway'
 import type { RemoteAccessBinding, RemoteAccessRole } from '@deepseek-ai/dsh-api-remote-access'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { remoteMethods, type PeerId, type PeerScope, type Principal, type RemoteInvocation } from '@deepseek-ai/dsh-typert-protocol'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -33,8 +32,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
 
 const OWNER: Principal = { kind: 'owner' }
 const GUEST: Principal = { kind: 'test-guest', guest: 'session-controller' }
-const SHARED = brandString<SessionId>('shared-session')
-const PRIVATE = brandString<SessionId>('private-session')
+const SHARED = SessionId('shared-session')
+const PRIVATE = SessionId('private-session')
 
 /** Calls the Session list and control methods; each item still needs a Session role. */
 const LISTER: RemoteAccessRole<'global'> = { name: 'test:session-lister', resource: 'global', actions: ['session/list', 'session/control'] }
@@ -275,7 +274,7 @@ describe('Session Controller access', () => {
     await ctx.plugin(TypertGatewayService)
     const bindings = guestPolicy(ctx)
     const ref = {
-      attachmentId: brandString<AttachmentId>(`sha256:${'ab'.repeat(32)}`),
+      attachmentId: AttachmentId(`sha256:${'ab'.repeat(32)}`),
       mediaType: 'image/png' as const, bytes: 2, width: 1, height: 1,
     }
     hidden.session.append('user/message', createUserMessage({

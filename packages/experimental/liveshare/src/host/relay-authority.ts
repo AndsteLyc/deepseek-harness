@@ -23,20 +23,11 @@ import type { ViewerReadService } from './viewer-read.ts'
 import { isRecord, json } from './wire-json.ts'
 import { relayFetch, type RelayFetch } from './relay-fetch.ts'
 
-/**
- * What one authoritative Relay read of a share produced.
- *
- * A read that fails states nothing the previous one did not: only the Relay answering that it has no
- * such share ends the work admitted against it. Unavailability closes no stream and stops no turn,
- * because a timeout or a restart of the Relay says nothing about the owner's own Session. A refusal —
- * 401 or 403 — does end admission without ending the owner's turn: the Relay will not admit anything
- * else through this share, while the turn the owner started runs against the owner's own tools.
- * Every failure reports `ok: false`; the difference is what this host already did about it, not a
- * caller's decision.
- */
-export type RelayAuthorityRead =
-  | { readonly ok: true; readonly accessState: ShareAccessStateFrame }
-  | { readonly ok: false }
+/** What one authoritative Relay read of a share produced. */
+export interface RelayAuthorityRead {
+  readonly ok: boolean
+  readonly accessState?: ShareAccessStateFrame
+}
 
 /**
  * Whether one requester still holds access to one share this host publishes.
@@ -104,10 +95,8 @@ export interface RelayAuthority {
   /**
    * Fence off one share's held authority and release the work admitted against it.
    * @param shareId - Share whose authority ended.
-   * @param stopTurn - Whether the turn this share started is stopped too; a withdrawn share is, a
-   *   refused one is not, because the owner's own turn there keeps running.
    */
-  invalidateRelayAccess(shareId: string, options?: { readonly stopTurn?: boolean }): void
+  invalidateRelayAccess(shareId: string): void
   /**
    * Adopt one Relay's statement of a share's access.
    * @param shareId - Share the frame describes.
@@ -118,7 +107,7 @@ export interface RelayAuthority {
    * Read one share's authority from its Relay and adopt what it states.
    * @param share - Share to read.
    * @param signal - Cancellation of the forwarded request.
-   * @returns The adopted snapshot, or a read that ended the share's work or changed nothing.
+   * @returns The snapshot that was adopted, or an unavailable read.
    */
   readRelayAuthority(share: OwnerShare, signal?: AbortSignal): Promise<RelayAuthorityRead>
   /**
@@ -180,35 +169,21 @@ async function relayRequests(
   }
 }
 
-/** What one HTTP answer from a Relay states about one share. */
-type RelayAuthorityAnswer =
-  | { readonly kind: 'state'; readonly accessState: ShareAccessStateFrame }
-  | { readonly kind: 'missing' }
-  | { readonly kind: 'refused' }
-  | { readonly kind: 'unavailable' }
-
 async function relayAuthorityRead(
   defaultRelay: string,
   share: OwnerShare,
   signal: AbortSignal | undefined,
   fetchRelay: RelayFetch,
-): Promise<RelayAuthorityAnswer> {
+): Promise<RelayAuthorityRead> {
   try {
     const response = await relayRequests(defaultRelay, share, signal, fetchRelay)
-    // Only "this Relay has no such share" states that the grant ended. A refused, failed, or
-    // unreadable answer is an unavailable one: relayRequests already turns a transport failure or
-    // its deadline into 502, so a local stall cannot be mistaken for a revocation.
-    if (response.status === 404 || response.status === 410) return { kind: 'missing' }
-    // The Relay decides a credential or a share it will not serve this host, and repeating the read
-    // with this token reaches the same answer, so the share serves no further viewer input.
-    if (response.status === 401 || response.status === 403) return { kind: 'refused' }
-    if (!response.ok) return { kind: 'unavailable' }
+    if (!response.ok) return { ok: false }
     const data: unknown = await response.json()
-    if (!isRecord(data)) return { kind: 'unavailable' }
+    if (!isRecord(data)) return { ok: false }
     const accessState = parseShareAccessState({ ...data, type: 'share-access-state' })
-    return accessState === undefined ? { kind: 'unavailable' } : { kind: 'state', accessState }
+    return { ok: true, ...(accessState === undefined ? {} : { accessState }) }
   } catch {
-    return { kind: 'unavailable' }
+    return { ok: false }
   }
 }
 
@@ -295,10 +270,10 @@ export function createRelayAuthority(deps: RelayAuthorityDeps): RelayAuthority {
     deps.accessChanged()
   }
 
-  function invalidateRelayAccess(shareId: string, options: { readonly stopTurn?: boolean } = {}): void {
+  function invalidateRelayAccess(shareId: string): void {
     relayGenerations.set(shareId, generationOf(shareId) + 1)
     const heldAuthority = relayAccess.delete(shareId)
-    if (options.stopTurn !== false && (heldAuthority || deps.ownerShares.get(shareId)?.online === true)) {
+    if (heldAuthority || deps.ownerShares.get(shareId)?.online === true) {
       deps.cancelShareTurn(shareId)
       deps.cancelChildTurns(shareId)
     }
@@ -349,10 +324,10 @@ export function createRelayAuthority(deps: RelayAuthorityDeps): RelayAuthority {
           deps.viewerRead().closeViewerStreams(shareId, child.creator)
         }
       }
-      // An admission that narrowed can have ended a viewer's grant: every source Session's recorded turn
-      // origin decides, so a turn a viewer started is stopped rather than left to keep driving the owner's
-      // machine, and the owner's own turn keeps running. A tier narrowing alone ends no turn, because
-      // every execution re-reads the share's current tier before writing.
+      // An admission that narrowed can have ended a viewer's grant, and the host no longer attributes a
+      // turn to a requester: it stops whatever the Session runs now rather than leave input admitted
+      // under a grant that ended driving the owner's machine. A tier narrowing alone ends no turn,
+      // because every execution re-reads the share's current tier before writing.
       if (admissionNarrowed(previous, state)) deps.cancelShareTurn(shareId)
       // The Session's sandbox follows its shares: a narrowed tier re-installs the read-only layer, and a
       // deadline that just passed releases it.
@@ -364,30 +339,17 @@ export function createRelayAuthority(deps: RelayAuthorityDeps): RelayAuthority {
   async function readRelayAuthority(share: OwnerShare, signal?: AbortSignal): Promise<RelayAuthorityRead> {
     signal?.throwIfAborted()
     const generation = generationOf(share.shareId)
-    const answer = await relayAuthorityRead(share.relay, share, signal, deps.relayFetch ?? relayFetch)
+    const snapshot = await relayAuthorityRead(share.relay, share, signal, deps.relayFetch ?? relayFetch)
     signal?.throwIfAborted()
     const current = deps.ownerShares.get(share.shareId)
     if (deps.disposed() || generation !== generationOf(share.shareId) || current?.gatewayToken !== share.gatewayToken
       || current.relay !== share.relay) return { ok: false }
-    if (answer.kind === 'missing') {
+    if (!snapshot.ok || snapshot.accessState === undefined) {
       invalidateRelayAccess(share.shareId)
       return { ok: false }
     }
-    // A refusal ends admission while the owner's turn keeps running: the Relay would not serve this
-    // host for the share, so it admits no further viewer input there. Calls and streams already open
-    // are released now, rather than at their next poll against the snapshot this read dropped.
-    if (answer.kind === 'refused') {
-      invalidateRelayAccess(share.shareId, { stopTurn: false })
-      for (const child of deps.forks.listForShare(share.shareId)) {
-        deps.viewerRead().closeViewerStreams(share.shareId, child.creator)
-      }
-      return { ok: false }
-    }
-    // An unavailable Relay read ends nothing here: the held statement stays, and every viewer path
-    // that needs a fresh admission is refused by refreshRelayAccess until a read succeeds again.
-    if (answer.kind === 'unavailable') return { ok: false }
-    applyRelayAccess(share.shareId, answer.accessState)
-    return { ok: true, accessState: answer.accessState }
+    applyRelayAccess(share.shareId, snapshot.accessState)
+    return snapshot
   }
 
   async function refreshRelayAccess(shareId: string, signal?: AbortSignal): Promise<void> {

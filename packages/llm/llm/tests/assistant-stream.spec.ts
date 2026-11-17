@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import {
   AssistantStreamAccumulator,
   BlockAssembler,
-  type ToolCallId,
+  ToolCallId,
   assembleAssistantStream,
   assistantStreamChunks,
   assistantStreamFirstTokenTime,
@@ -30,7 +29,7 @@ describe('AssistantStreamAccumulator', () => {
         chunk: {
           type: 'tool-call-delta',
           index: 1,
-          id: brandString<ToolCallId>('call-1'),
+          id: ToolCallId('call-1'),
           name: 'run_code',
           argumentsDelta: '{',
         },
@@ -40,7 +39,7 @@ describe('AssistantStreamAccumulator', () => {
         chunk: {
           type: 'tool-call-delta',
           index: 1,
-          id: brandString<ToolCallId>('call-1'),
+          id: ToolCallId('call-1'),
           name: 'run_code',
           argumentsDelta: '}',
         },
@@ -109,22 +108,22 @@ describe('AssistantStreamAccumulator', () => {
       { time: 4, chunk: { type: 'text-delta', index: 1, text: 'b' } },
       {
         time: 5,
-        chunk: { type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('one'), argumentsDelta: '{' },
+        chunk: { type: 'tool-call-delta', index: 0, id: ToolCallId('one'), argumentsDelta: '{' },
       },
       {
         time: 6,
-        chunk: { type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('one'), argumentsDelta: '}' },
+        chunk: { type: 'tool-call-delta', index: 0, id: ToolCallId('one'), argumentsDelta: '}' },
       },
       {
         time: 7,
         chunk: {
-          type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('one'), name: 'read', argumentsDelta: '',
+          type: 'tool-call-delta', index: 0, id: ToolCallId('one'), name: 'read', argumentsDelta: '',
         },
       },
       {
         time: 8,
         chunk: {
-          type: 'tool-call-delta', index: 1, id: brandString<ToolCallId>('two'), name: 'read', argumentsDelta: 'x',
+          type: 'tool-call-delta', index: 1, id: ToolCallId('two'), name: 'read', argumentsDelta: 'x',
         },
       },
       { time: Number.MAX_SAFE_INTEGER, chunk: { type: 'text-delta', index: 1, text: 'far' } },
@@ -165,12 +164,12 @@ describe('AssistantStreamAccumulator', () => {
     })).toThrow(/text must be a string/)
     expect(accumulator.push({
       time: 1,
-      chunk: { type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>(''), argumentsDelta: '{}' },
+      chunk: { type: 'tool-call-delta', index: 0, id: ToolCallId(''), argumentsDelta: '{}' },
     }).chunk).toMatchObject({ id: '' })
     expect(accumulator.push({
       time: 1,
       chunk: {
-        type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('call'), name: '', argumentsDelta: '{}',
+        type: 'tool-call-delta', index: 0, id: ToolCallId('call'), name: '', argumentsDelta: '{}',
       },
     }).chunk).toMatchObject({ name: '' })
     expect(() => accumulator.push({
@@ -180,13 +179,13 @@ describe('AssistantStreamAccumulator', () => {
     expect(() => accumulator.push({
       time: 1,
       chunk: {
-        type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('call'), name: 1, argumentsDelta: '{}',
+        type: 'tool-call-delta', index: 0, id: ToolCallId('call'), name: 1, argumentsDelta: '{}',
       } as never,
     })).toThrow(/name must be a string/)
     expect(() => accumulator.push({
       time: 1,
       chunk: {
-        type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('call'), argumentsDelta: 1,
+        type: 'tool-call-delta', index: 0, id: ToolCallId('call'), argumentsDelta: 1,
       } as never,
     })).toThrow(/argumentsDelta must be a string/)
     expect(() => accumulator.push({
@@ -279,7 +278,7 @@ function toolRun(
   name?: string,
 ): RunOf<'tool-call-chunks'> {
   return {
-    type: 'tool-call-chunks', time0, index: 0, dt, id: brandString<ToolCallId>('call'),
+    type: 'tool-call-chunks', time0, index: 0, dt, id: ToolCallId('call'),
     ...name === undefined ? {} : { name },
     args,
   }
@@ -295,10 +294,10 @@ describe('stream chunk classification', () => {
     expect(isTokenDelta({ type: 'text-delta', index: 0, text: '' })).toBe(false)
     expect(isTokenDelta({ type: 'reasoning-delta', index: 0, text: 'r' })).toBe(true)
     expect(isTokenDelta({ type: 'reasoning-delta', index: 0, text: '' })).toBe(false)
-    expect(isTokenDelta({ type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('c'), argumentsDelta: '{' })).toBe(true)
-    expect(isTokenDelta({ type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('c'), argumentsDelta: '' })).toBe(false)
-    expect(isTokenDelta({ type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('c'), name: 'read', argumentsDelta: '' })).toBe(true)
-    expect(isTokenDelta({ type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('c'), name: '', argumentsDelta: '' })).toBe(true)
+    expect(isTokenDelta({ type: 'tool-call-delta', index: 0, id: ToolCallId('c'), argumentsDelta: '{' })).toBe(true)
+    expect(isTokenDelta({ type: 'tool-call-delta', index: 0, id: ToolCallId('c'), argumentsDelta: '' })).toBe(false)
+    expect(isTokenDelta({ type: 'tool-call-delta', index: 0, id: ToolCallId('c'), name: 'read', argumentsDelta: '' })).toBe(true)
+    expect(isTokenDelta({ type: 'tool-call-delta', index: 0, id: ToolCallId('c'), name: '', argumentsDelta: '' })).toBe(true)
     expect(isTokenDelta({ type: 'block-start', index: 0, blockType: 'text' })).toBe(false)
     expect(isTokenDelta({ type: 'block-end', index: 0, block: { type: 'text', text: 'x' } })).toBe(false)
     expect(isTokenDelta({ type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } })).toBe(false)
@@ -317,10 +316,10 @@ describe('stream chunk classification', () => {
     expect(isVisibleChunk({ type: 'block-end', index: 0, block: { type: 'text', text: '  ' } })).toBe(false)
     expect(isVisibleChunk({ type: 'block-end', index: 0, block: { type: 'reasoning', text: 'why' } })).toBe(true)
     expect(isVisibleChunk({
-      type: 'block-end', index: 0, block: { type: 'tool-call', id: brandString<ToolCallId>('c'), name: 'read', arguments: '{}' },
+      type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId('c'), name: 'read', arguments: '{}' },
     })).toBe(false)
     expect(isVisibleChunk({ type: 'block-end', index: 0, block: { type: 'image', attachment: {} as never } })).toBe(true)
-    expect(isVisibleChunk({ type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('c'), name: 'read', argumentsDelta: '{}' })).toBe(false)
+    expect(isVisibleChunk({ type: 'tool-call-delta', index: 0, id: ToolCallId('c'), name: 'read', argumentsDelta: '{}' })).toBe(false)
     expect(isVisibleChunk({ type: 'usage', usage: { inputTokens: 1, outputTokens: 1 } })).toBe(false)
     expect(isVisibleChunk({ type: 'finish', reason: { kind: 'stop' } })).toBe(false)
   })
@@ -400,7 +399,7 @@ describe('compact stream readers', () => {
     const silent: readonly AssistantStreamRecord[] = [
       raw(1, { type: 'block-start', index: 0, blockType: 'tool-call' }),
       toolRun(2, [1], ['', ''], 'read'),
-      raw(4, { type: 'block-end', index: 0, block: { type: 'tool-call', id: brandString<ToolCallId>('call'), name: 'read', arguments: '' } }),
+      raw(4, { type: 'block-end', index: 0, block: { type: 'tool-call', id: ToolCallId('call'), name: 'read', arguments: '' } }),
       textRun(5, [1], [' ', '\t'], 1),
       reasoningRun(7, [], ['  '], 2),
       raw(8, { type: 'block-end', index: 1, block: { type: 'text', text: ' \t' } }),
@@ -420,8 +419,8 @@ describe('compact stream readers', () => {
 
   it('reads raw text deltas and empty-argument Tool-call deltas the accumulator kept as chunks', () => {
     const degenerate: readonly AssistantStreamRecord[] = [
-      raw(1, { type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>(''), argumentsDelta: '' }),
-      raw(2, { type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('call'), name: '', argumentsDelta: '' }),
+      raw(1, { type: 'tool-call-delta', index: 0, id: ToolCallId(''), argumentsDelta: '' }),
+      raw(2, { type: 'tool-call-delta', index: 0, id: ToolCallId('call'), name: '', argumentsDelta: '' }),
       raw(3, { type: 'text-delta', index: 1, text: ' ' }),
       raw(4, { type: 'text-delta', index: 1, text: 'raw' }),
     ]
@@ -436,7 +435,7 @@ describe('compact stream readers', () => {
   it('stops at the first qualifying record', () => {
     expect(assistantStreamFirstTokenTime([textRun(5, [], ['x']), unreachableRecord])).toBe(5)
     expect(assistantStreamFirstTokenTime([
-      raw(6, { type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('call'), name: '', argumentsDelta: '' }),
+      raw(6, { type: 'tool-call-delta', index: 0, id: ToolCallId('call'), name: '', argumentsDelta: '' }),
       unreachableRecord,
     ])).toBe(6)
     expect(assistantStreamHasVisibleContent([raw(1, { type: 'block-start', index: 0, blockType: 'image' }), unreachableRecord])).toBe(true)
@@ -459,10 +458,10 @@ describe('compact stream readers', () => {
       { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'think' } },
       { type: 'text-delta', index: 1, text: 'an' },
       { type: 'text-delta', index: 1, text: 'swer' },
-      { type: 'tool-call-delta', index: 2, id: brandString<ToolCallId>('call-1'), name: 'read', argumentsDelta: '' },
-      { type: 'tool-call-delta', index: 2, id: brandString<ToolCallId>('call-1'), argumentsDelta: '{"path":' },
-      { type: 'tool-call-delta', index: 2, id: brandString<ToolCallId>('call-1'), argumentsDelta: '"a"}' },
-      { type: 'tool-call-delta', index: 3, id: brandString<ToolCallId>(''), argumentsDelta: '{}' },
+      { type: 'tool-call-delta', index: 2, id: ToolCallId('call-1'), name: 'read', argumentsDelta: '' },
+      { type: 'tool-call-delta', index: 2, id: ToolCallId('call-1'), argumentsDelta: '{"path":' },
+      { type: 'tool-call-delta', index: 2, id: ToolCallId('call-1'), argumentsDelta: '"a"}' },
+      { type: 'tool-call-delta', index: 3, id: ToolCallId(''), argumentsDelta: '{}' },
       { type: 'usage', usage: { inputTokens: 3, outputTokens: 2 } },
       { type: 'finish', reason: { kind: 'tool-calls' }, replayState: { response: { id: 'r' } } },
     ]

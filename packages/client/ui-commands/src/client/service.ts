@@ -5,10 +5,8 @@
  * catalog with contributions by availability, gives built-in Host rows their
  * localized face (presentation.ts), then position-filters; an empty query
  * lists the Add and Commands sections in usage order, a typed query ranks
- * every row through the shared search filter (`dsh-util-text-search`) over
- * name and label. Descriptions stay unmatched: this source shares one menu and
- * its default highlight with other sources, so a description-only hit would
- * take Enter from a name another group matched. A host/contribution name collision fails loud. Every
+ * every row by the `/` menu's shared name-and-label ranking (ui-primitives
+ * `rankByName`). A host/contribution name collision fails loud. Every
  * execute addresses the session's agent by sessionId — sessions are always
  * agent-backed.
  * Catalog RPCs retain an existing Client Session through completion and
@@ -25,7 +23,7 @@ import type { ISessions, SessionBinding } from '@deepseek-ai/dsh-api-session-con
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WeakMapWithValues } from '@deepseek-ai/dsh-util-values'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
-import { TextSearchIndex } from '@deepseek-ai/dsh-util-text-search'
+import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   CandidateRequest, ClientSessionContext, CommandClaim, PickOutcome, InputTriggerCandidate, InputTriggerPick,
   SubmitAttachment, SubmitEnvelope, SubmitOutcome,
@@ -221,7 +219,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
   /**
    * Menu candidates: host catalog + contribution availability, built-in rows
    * localized, then position filtering; sections for an empty query, the
-   * shared search filter for a typed one.
+   * shared name-and-label ranking for a typed one.
    */
   private async candidates(session: ClientSessionContext, req: CandidateRequest): Promise<readonly InputTriggerCandidate[]> {
     const list = await this.directory.ensureReady(session.sessionId, req.signal)
@@ -248,7 +246,7 @@ export class CommandUiRuntime extends Service implements CommandUiContract {
       })
     }
     const visible = rows.filter(c => req.position === 'leading' || c.hint === undefined)
-    return req.query === '' ? sectionRows(visible, this.t) : new TextSearchIndex(visible, row => ({ fuzzy: [row.name, row.label] })).search(req.query)
+    return req.query === '' ? sectionRows(visible, this.t) : rankByName(visible, req.query)
   }
 
   /** Decision table, menu column: contribution/decorated-host → popup or action; host input → claim; host bare → detached execute. */

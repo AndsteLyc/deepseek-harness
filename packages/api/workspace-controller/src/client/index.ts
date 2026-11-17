@@ -5,7 +5,6 @@ import {
   RemoteSnapshotStream,
   RemoteStreamCarrierError,
   type ClientRemote,
-  type RemoteStreamCarrierFailure,
 } from '@deepseek-ai/dsh-api-gateway/client'
 import type { WorkspaceFollowFrame, WorkspaceFollowIncrement } from '../types.ts'
 import type { WorkspaceFollowSink } from './model.ts'
@@ -65,7 +64,7 @@ export interface WorkspaceStateStreamOptions {
   /** Destinations for decoded Workspace state operations. */
   readonly accept: WorkspaceFollowSink
   /** Observe a retryable carrier loss before reconnection. */
-  readonly carrierFailed?: (error: RemoteStreamCarrierFailure) => void
+  readonly carrierFailed?: (error: RemoteStreamCarrierError) => void
   /** Publish a terminal business or protocol failure. */
   readonly failed: (error: unknown) => void
 }

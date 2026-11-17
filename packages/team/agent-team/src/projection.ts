@@ -10,19 +10,22 @@ import type {
   TeamTaskSnapshot,
   TeamTaskView,
 } from './types.ts'
-import type { TeamTaskId } from './types.ts'
+import {
+  TeamId as toTeamId,
+  TeamTaskId as toTeamTaskId,
+} from './types.ts'
 import { assertTaskGraphCandidate } from './task-graph.ts'
 import { projectTaskView } from './task-view.ts'
 
 const nonNegativeSafeInteger = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
 const positiveSafeInteger = nonNegativeSafeInteger.min(1)
 const sessionIdSchema = z.string().min(1).transform(value => brandString<SessionId>(value))
-const teamIdSchema = z.string().min(1).transform(value => brandString<TeamId>(value))
+const teamIdSchema = z.string().min(1).transform(value => toTeamId(value))
 const numericTaskIdPattern = /^task-(\d+)$/u
 const teamTaskIdSchema = z.string().min(1).refine((value) => {
   const match = numericTaskIdPattern.exec(value)
   return match === null || Number.isSafeInteger(Number(match[1]))
-}, { message: 'numeric task id suffix must be a safe integer' }).transform(value => brandString<TeamTaskId>(value))
+}, { message: 'numeric task id suffix must be a safe integer' }).transform(value => toTeamTaskId(value))
 const teamTaskSnapshotSchema = z.object({
   id: teamTaskIdSchema,
   revision: positiveSafeInteger,
@@ -69,7 +72,7 @@ export interface TeamState {
 export function emptyTeamState(rootId: SessionId, inheritedEventCount = 0): TeamProjectionState {
   return {
     inheritedEventCount,
-    id: brandString<TeamId>(rootId),
+    id: toTeamId(rootId),
     tasks: [],
     nextTaskNumber: 1,
   }

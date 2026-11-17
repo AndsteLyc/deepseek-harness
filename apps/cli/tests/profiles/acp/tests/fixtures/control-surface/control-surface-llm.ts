@@ -1,11 +1,10 @@
 /** Keyless two-model adapter for the generic ACP control-surface conformance test. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import {
-  type ToolCallId,
+  ToolCallId,
   LlmAdapter,
-  type ReasoningEffortId,
+  ReasoningEffortId,
   type GenerateOptions,
   type LlmResolvedModelInfo,
   type StreamChunk,
@@ -35,10 +34,10 @@ class ControlSurfaceAdapter extends LlmAdapter {
       context: { contextWindow: 2_048 },
       reasoning: {
         efforts: [
-          { id: brandString<ReasoningEffortId>('low'), name: 'Low' },
-          { id: brandString<ReasoningEffortId>('high'), name: 'High' },
+          { id: ReasoningEffortId('low'), name: 'Low' },
+          { id: ReasoningEffortId('high'), name: 'High' },
         ],
-        defaultEffort: brandString<ReasoningEffortId>('high'),
+        defaultEffort: ReasoningEffortId('high'),
       },
     })
   }
@@ -51,7 +50,7 @@ class ControlSurfaceAdapter extends LlmAdapter {
       .join('')
     const hasToolResult = current.some(message => message.role === 'tool')
     if (!hasToolResult) {
-      const callId = brandString<ToolCallId>(userText.includes('cancel') ? 'control-cancel-add' : 'control-add')
+      const callId = ToolCallId(userText.includes('cancel') ? 'control-cancel-add' : 'control-add')
       yield { type: 'block-start', index: 0, blockType: 'reasoning' }
       yield { type: 'reasoning-delta', index: 0, text: 'checking the attached tool' }
       yield { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'checking the attached tool' } }

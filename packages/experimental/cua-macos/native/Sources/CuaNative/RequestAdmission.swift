@@ -22,7 +22,6 @@ struct RequestParameters: Sendable {
             }
         }
         self.values = values
-        if contains("windowId") { _ = try windowID() }
     }
     static func invalid(_ message: String) -> NativeFailure { NativeFailure(code: "INVALID_ARGUMENT", message: message) }
     func contains(_ key: String) -> Bool { values[key] != nil }
@@ -55,13 +54,7 @@ struct RequestParameters: Sendable {
         }
         return integer
     }
-    func windowID() throws -> UInt32 {
-        let text = try string("windowId")
-        guard let id = UInt32(text), id > 0, String(id) == text else {
-            throw Self.invalid("windowId must be a canonical decimal string in 1...\(UInt32.max)")
-        }
-        return id
-    }
+    func windowID() throws -> UInt32 { UInt32(try integer("windowId", in: 1...Int(UInt32.max))) }
     func optionalWindowID() throws -> UInt32? { contains("windowId") ? try windowID() : nil }
     /// Element ids are opaque strings on the wire; this helper accepts its decimal form and returns the snapshot index.
     func elementIdIndex() throws -> Int {

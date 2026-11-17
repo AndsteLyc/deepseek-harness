@@ -3,8 +3,8 @@ import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { Session, type SessionId } from '@deepseek-ai/dsh-session'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session/types'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED } from '@deepseek-ai/dsh-tools'
@@ -20,7 +20,6 @@ import { renderPwshPromoted } from '../src/render.ts'
 import * as ToolPwsh from '@deepseek-ai/dsh-tool-pwsh'
 import * as BashEnvPlugin from '@deepseek-ai/dsh-shell-env'
 import { processSources, ringDelta } from '../src/background.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 const testToolSignal = new AbortController().signal
 
@@ -106,7 +105,7 @@ let callCounter = 0
 function call(ctx: Context, args: Record<string, unknown>) {
   return executeToolFixture(ctx, {
     signal: testToolSignal,
-    callId: brandString<ToolCallId>(`pwsh-background-${++callCounter}`),
+    callId: ToolCallId(`pwsh-background-${++callCounter}`),
     name: 'pwsh',
     arguments: args,
   })
@@ -209,7 +208,7 @@ describe('background pwsh output', () => {
 describe('owned background output (pwsh)', () => {
   it('keeps an owned background run under the owning session', async () => {
     const { ctx, pwsh } = await setup()
-    const ownerId = brandString<SessionId>('pwsh-background-owner')
+    const ownerId = SessionId('pwsh-background-owner')
     const owner: Agent = {
       id: ownerId,
       options: {},
@@ -233,7 +232,7 @@ describe('owned background output (pwsh)', () => {
     pwsh.backgroundHandler = () => scripted.proc
     await executeToolFixture(ctx, {
       signal: testToolSignal,
-      callId: brandString<ToolCallId>('pwsh-background-owned'),
+      callId: ToolCallId('pwsh-background-owned'),
       name: 'pwsh',
       arguments: { command: 'Get-Slow', description: 'test command', run_in_background: true },
       agent: owner,
@@ -408,7 +407,7 @@ describe('foreground commands as jobs (pwsh)', () => {
     const controller = new AbortController()
     const pending = executeToolFixture(ctx, {
       signal: controller.signal,
-      callId: brandString<ToolCallId>('pwsh-call-aborted'),
+      callId: ToolCallId('pwsh-call-aborted'),
       name: 'pwsh',
       arguments: { command: 'Get-Slow', description: 'test command', timeoutMs: 5_000 },
     })
@@ -431,7 +430,7 @@ describe('foreground commands as jobs (pwsh)', () => {
     const controller = new AbortController()
     const pending = executeToolFixture(ctx, {
       signal: controller.signal,
-      callId: brandString<ToolCallId>('pwsh-call-aborted-slow-kill'),
+      callId: ToolCallId('pwsh-call-aborted-slow-kill'),
       name: 'pwsh',
       arguments: { command: 'Get-Slow', description: 'test command', timeoutMs: 100 },
     })
@@ -460,7 +459,7 @@ describe('foreground commands as jobs (pwsh)', () => {
 
   it('registers the job under the calling agent and stops it through the registry kill', async () => {
     const { ctx, pwsh } = await setup()
-    const ownerId = brandString<SessionId>('pwsh-promote-owner')
+    const ownerId = SessionId('pwsh-promote-owner')
     const owner: Agent = {
       id: ownerId,
       options: {},
@@ -485,7 +484,7 @@ describe('foreground commands as jobs (pwsh)', () => {
 
     const result = await executeToolFixture(ctx, {
       signal: testToolSignal,
-      callId: brandString<ToolCallId>('pwsh-observe-promote-owned'),
+      callId: ToolCallId('pwsh-observe-promote-owned'),
       name: 'pwsh',
       arguments: { command: 'Get-Slow', description: 'test command', timeoutMs: 250 },
       agent: owner,

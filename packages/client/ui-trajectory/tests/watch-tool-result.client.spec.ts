@@ -1,10 +1,9 @@
 /** Selected-result transport releases values on carrier loss and closes on inspector disposal. */
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { RemoteStream, RemoteStreamCarrierError } from '@deepseek-ai/dsh-api-gateway/client'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionToolResultValue } from '../src/types.ts'
 import { createToolResultWatcher } from '../src/client/watch-tool-result.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 function deferred() {
   let resolve!: () => void
@@ -45,7 +44,7 @@ it('cancels the selected subscription to quiescence without publishing late valu
     } finally {
       finished.resolve()
     }
-  }), brandString<SessionId>('selected'), report)
+  }), SessionId('selected'), report)
   const close = watcher(42, publish)
   onTestFinished(async () => { close(); await finished.promise })
   await opened.promise
@@ -61,7 +60,7 @@ it('clears the displayed object on carrier loss while the reconnect owner waits'
   const watcher = createToolResultWatcher(remote(async function* () {
     yield { available: true, value: { answer: 42 } }
     throw new RemoteStreamCarrierError('connection lost')
-  }), brandString<SessionId>('selected'), () => {})
+  }), SessionId('selected'), () => {})
   const close = watcher(42, (value) => {
     values.push(value)
     if (value === undefined) cleared.resolve()

@@ -12,25 +12,23 @@ import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as PtcToolExecutor from '@deepseek-ai/dsh-tool-executor-ptc'
 import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from 'vitest'
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import { PtcImage, PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
+import { PtcRuntime } from '@deepseek-ai/dsh-ptc-runtime'
 import type { PtcRunRequest, PtcRunResult } from '@deepseek-ai/dsh-ptc-runtime'
-import { type ToolCallId, LlmAdapter, LlmRuntime } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, LlmAdapter, LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmModelInfo, LlmResolvedModelInfo, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
-import type { PostToolDecision } from '@deepseek-ai/dsh-tools'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import * as FsPolicy from '@deepseek-ai/dsh-fs-observation-policy'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
-import { AttachmentError, type AttachmentId, AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import { AttachmentError, AttachmentId, AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { FsError } from '@deepseek-ai/dsh-fs'
 import type { ImageAttachmentLimits, ImageAttachmentRef, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import * as ToolFs from '@deepseek-ai/dsh-tool-fs'
-import { brandString } from '@deepseek-ai/dsh-brand'
 import {
   applyReadImageTool,
   formatImageReadOutput,
@@ -82,7 +80,7 @@ class FakeRuntime extends PtcRuntime {
 
   readonly language = 'typescript'
   readonly isolation = 'fake'
-  behavior: (request: PtcRunRequest) => Promise<PtcRunResult> = () => Promise.resolve({ output: [] })
+  behavior: (request: PtcRunRequest) => Promise<PtcRunResult> = () => Promise.resolve({ logs: [] })
 
   run(request: PtcRunRequest): Promise<PtcRunResult> {
     return this.behavior(request)
@@ -156,7 +154,7 @@ function call(ctx: Context, name: string, args: unknown, agent?: object) {
   const execute = name === RUN_CODE_NAME ? executeModelToolFixture : executeToolFixture
   return execute(ctx, {
     signal: testToolSignal,
-    callId: brandString<ToolCallId>(`img-call-${++callCounter}`),
+    callId: ToolCallId(`img-call-${++callCounter}`),
     name,
     arguments: args,
     ...agent ? { agent: agent as never } : {},
@@ -299,100 +297,31 @@ describe('read_image happy path', () => {
     expect(result.isError).toBe(false)
   })
 
-  it('displays the selected program image among captured text', async () => {
+  it('forwards a nested PTC mode image through the outer run_code context', async () => {
     await writeFile(join(dir, 'red.png'), PNG_1X1)
     const ctx = await setup({ toolMode: 'ptc' })
     const runtime = ctx.ptcRuntime as FakeRuntime
     runtime.behavior = async (request) => {
       const value = await request.bindings[0]!.functions.read_image!({ file_path: 'red.png' })
-      expect(value).toBeInstanceOf(PtcImage)
-      if (!(value instanceof PtcImage)) throw new Error('read_image must return an Image')
-      expect(await readFile(value.path)).toEqual(PNG_1X1)
-      expect([value.attachment.width, value.attachment.height]).toEqual([1, 1])
-      return { output: [{ type: 'text', text: 'before' }, { type: 'image', attachment: value.attachment }, { type: 'text', text: 'after' }] }
+      return { logs: [], value }
     }
 
     const result = await call(ctx, RUN_CODE_NAME, {
-      code: 'inspect("before", await tools.read_image({ file_path: "red.png" }), "after")',
+      code: 'return await tools.read_image({ file_path: "red.png" })',
       description: 'Read the image through PTC mode',
     }, { ...agentOn('vision-model'), ctx })
 
     expect(result.isError).toBe(false)
-    expect(result.additionalContexts).toBeUndefined()
-    expect(result.content).toMatchObject([
-      { type: 'text', text: 'before' },
-      { type: 'image', attachment: { mediaType: 'image/png', width: 1, height: 1 } },
-      { type: 'text', text: 'after' },
-    ])
-  })
-
-  it.each([
-    ['around', 'block', 'success'], ['around', 'block', 'failure'],
-    ['around', 'redact', 'failure'], ['around', 'replace', 'success'], ['around', 'recover', 'failure'],
-    ['post', 'block', 'success'], ['post', 'block', 'failure'], ['post', 'replace', 'success'],
-  ] as const)('honors an outer %s %s decision after program %s with inspected images', async (stage, decision, outcome) => {
-    await writeFile(join(dir, 'red.png'), PNG_1X1)
-    const ctx = await setup({ toolMode: 'ptc' })
-    const runtime = ctx.ptcRuntime as FakeRuntime
-    runtime.behavior = async (request) => {
-      const image = await request.bindings[0]!.functions.read_image!({ file_path: 'red.png' })
-      if (!(image instanceof PtcImage)) throw new Error('read_image must return an Image')
-      return {
-        output: [{ type: 'image', attachment: image.attachment }],
-        ...outcome === 'failure' ? { error: { kind: 'exception' as const, message: 'program stopped' } } : {},
-      }
-    }
-    if (stage === 'around') {
-      ctx.on('tools/execute', async (exec, next) => {
-        const result = await next()
-        if (exec.name !== RUN_CODE_NAME) return result
-        if (decision === 'redact') return { ...result, content: [{ type: 'text', text: 'image blocked' }] }
-        return decision === 'block'
-          ? { isError: true, error: { message: 'image blocked' }, content: [{ type: 'text', text: 'image blocked' }] }
-          : { isError: false, value: { logs: ['image replaced'] }, content: [{ type: 'text', text: 'image replaced' }] }
-      })
-    } else {
-      ctx.on('tools/post-execute', (exec, _result, next): Promise<PostToolDecision> => {
-        if (exec.name !== RUN_CODE_NAME) return next()
-        return Promise.resolve(decision === 'block'
-          ? { kind: 'block', feedback: [{ type: 'text', text: 'image blocked' }] }
-          : { kind: 'accept', value: { logs: ['image replaced'] } })
-      })
-    }
-
-    const result = await call(ctx, RUN_CODE_NAME, {
-      code: 'inspect(await tools.read_image({ file_path: "red.png" }))', description: 'Inspect an image',
-    }, { ...agentOn('vision-model'), ctx })
-
-    const blocked = decision === 'block' || decision === 'redact'
-    expect(result.isError).toBe(blocked)
-    expect(result.content).toEqual([{ type: 'text', text: blocked ? 'image blocked' : 'image replaced' }])
-  })
-
-  it.each(['exception', 'timeout'] as const)('preserves inspected text and image order after an %s', async (kind) => {
-    await writeFile(join(dir, 'red.png'), PNG_1X1)
-    const ctx = await setup({ toolMode: 'ptc' })
-    const runtime = ctx.ptcRuntime as FakeRuntime
-    runtime.behavior = async (request) => {
-      const image = await request.bindings[0]!.functions.read_image!({ file_path: 'red.png' })
-      if (!(image instanceof PtcImage)) throw new Error('read_image must return an Image')
-      return {
-        output: [{ type: 'text', text: 'before' }, { type: 'image', attachment: image.attachment }, { type: 'text', text: 'after' }],
-        error: { kind, message: 'program stopped' },
-      }
-    }
-    const result = await call(ctx, RUN_CODE_NAME, { code: 'program', description: 'Inspect before stopping' }, {
-      ...agentOn('vision-model'), ctx,
+    expect(result.content.every(block => block.type === 'text')).toBe(true)
+    expect(result.additionalContexts).toHaveLength(1)
+    const forwarded = result.additionalContexts?.[0]?.content
+    expect(forwarded).toHaveLength(2)
+    expect(forwarded?.[0]?.type).toBe('text')
+    expect(forwarded?.[0]?.type === 'text' ? forwarded[0].text : '').toContain('<type>image</type>')
+    expect(forwarded?.[1]).toMatchObject({
+      type: 'image',
+      attachment: { mediaType: 'image/png', width: 1, height: 1 },
     })
-    expect(result.isError).toBe(true)
-    const diagnostic = result.content[0]
-    if (diagnostic?.type !== 'text') throw new Error('Expected a separate failure diagnostic')
-    expect(diagnostic.text).toContain(`code run failed (${kind}): program stopped`)
-    expect(result.content.slice(1)).toMatchObject([
-      { type: 'text', text: 'before' },
-      { type: 'image', attachment: { mediaType: 'image/png', width: 1, height: 1 } },
-      { type: 'text', text: 'after' },
-    ])
   })
 })
 
@@ -561,7 +490,7 @@ describe('strict image-modality gate', () => {
     const result = await readImage(ctx, { file_path: 'red.png' }, agentOn(model))
     expect(result.isError).toBe(true)
     expect(text(result)).toContain('does not declare image input')
-    expect(result.error?.info).toEqual({ name: 'ImageInputError', code: 'MODEL_DOES_NOT_SUPPORT_IMAGES' })
+    expect(result.error?.info).toEqual({ name: 'ImageInputError', code: 'IMAGE_UNSUPPORTED_MODEL' })
   })
 
   it('refuses when the route cannot be resolved (no agent, or no header and no options)', async () => {
@@ -737,7 +666,7 @@ describe('image admission failures', () => {
     FailingStore.failure = failure
     return executeToolFixture(ctx, {
       signal,
-      callId: brandString<ToolCallId>(`img-call-${++callCounter}`),
+      callId: ToolCallId(`img-call-${++callCounter}`),
       name: 'read_image',
       arguments: { file_path: file },
       agent: agentOn('vision-model') as never,
@@ -844,7 +773,7 @@ describe('image admission failures', () => {
       }
 
       async saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef> {
-        return { attachmentId: brandString<AttachmentId>('sha256:feed'), mediaType: input.mediaType, bytes: input.data.length, width: 1, height: 1 }
+        return { attachmentId: AttachmentId('sha256:feed'), mediaType: input.mediaType, bytes: input.data.length, width: 1, height: 1 }
       }
 
       readImage(_ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
@@ -878,7 +807,7 @@ describe('image admission failures', () => {
 
       async saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef> {
         return {
-          attachmentId: brandString<AttachmentId>('sha256:feed'),
+          attachmentId: AttachmentId('sha256:feed'),
           mediaType: input.mediaType,
           bytes: 7,
           width: 2,
@@ -984,7 +913,7 @@ describe('registration surface', () => {
   it('declares read_image parallel-safe and presents a read-family card', async () => {
     const ctx = await setup()
     expect(new ToolExecutionPipeline(ctx).executionMode({
-      signal: testToolSignal, callId: brandString<ToolCallId>('img-parallel'), name: 'read_image', arguments: { file_path: 'a.png' },
+      signal: testToolSignal, callId: ToolCallId('img-parallel'), name: 'read_image', arguments: { file_path: 'a.png' },
     })).toEqual({ kind: 'parallel' })
     expect(ctx.tools.get('read_image')?.presentCall?.({ file_path: 'shot.png' })).toEqual({
       card: 'generic',

@@ -1,11 +1,16 @@
 /** Submit one production fixed-installer cache purge to EdgeOne. */
 import type { teo } from 'tencentcloud-sdk-nodejs-teo'
 import type { DesktopPackageTargetName } from './package-target.ts'
-import type { DesktopPurgeConfig } from '@deepseek-ai/dsh-desktop-publisher/desktop-purge-types.ts'
-import { desktopLatestInstallerFilename, requiredEnvironmentValue, resolveDesktopAutoUpdateEnvironment, resolveDesktopUploadConfig } from '@deepseek-ai/dsh-desktop-publisher/desktop-auto-update-environment.mjs'
+import { desktopLatestInstallerFilename, requiredEnvironmentValue, resolveDesktopAutoUpdateEnvironment, resolveDesktopUploadConfig } from './desktop-auto-update-environment.mjs'
 import { desktopTargetPlatform } from './desktop-build-paths.mjs'
 
-export type { DesktopPurgeConfig } from '@deepseek-ai/dsh-desktop-publisher/desktop-purge-types.ts'
+/** Validated production destination and credentials; never serialize this value. */
+export interface DesktopPurgeConfig {
+  readonly zoneId: string
+  readonly publicUrl: string
+  readonly secretId: string
+  readonly secretKey: string
+}
 
 /** The single SDK operation needed to submit a purge. */
 export type DesktopPurgeClient = Pick<InstanceType<typeof teo.v20220901.Client>, 'CreatePurgeTask'>

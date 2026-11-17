@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session'
-import { type JobId, JobRegistry } from '@deepseek-ai/dsh-jobs'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { JobId, JobRegistry } from '@deepseek-ai/dsh-jobs'
 import type {
   JobEvent, JobEventFilter, JobEventListener, JobHooks, JobOutputSource, JobOutputRead, JobRead, JobSpec, JobView,
 } from '@deepseek-ai/dsh-jobs'
@@ -41,13 +40,13 @@ class StubJobRegistry extends JobRegistry {
 
   start(spec: JobSpec): JobId {
     this.started.push(spec)
-    const id = brandString<JobId>(`${spec.kind}-1`)
+    const id = JobId(`${spec.kind}-1`)
     spec.run({ id, append() {}, updateProgress() {} })
     return id
   }
 
   list(caller?: SessionId): JobView[] {
-    return [this.view(brandString<JobId>('bash-1'), caller)]
+    return [this.view(JobId('bash-1'), caller)]
   }
 
   get(id: JobId, caller?: SessionId): JobView {
@@ -81,7 +80,7 @@ describe('JobRegistry seam', () => {
   it('a concrete subclass registers as ctx.jobs and serves the abstract API', async () => {
     const ctx = new Context()
     await ctx.plugin(StubJobRegistry)
-    const caller = brandString<SessionId>('session-1')
+    const caller = SessionId('session-1')
     const hooks: JobHooks = { cancel() {}, done: new Promise(() => {}) }
 
     const detachController = ctx.jobs.attachController('seam-test')

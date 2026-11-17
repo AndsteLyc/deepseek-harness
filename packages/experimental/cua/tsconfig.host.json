@@ -22,9 +22,6 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../../core/tool-executor-ptc"
-    },
-    {
       "path": "../../core/system-prompt"
     },
     {
@@ -38,9 +35,6 @@
     },
     {
       "path": "../../util/brand"
-    },
-    {
-      "path": "../../util/error"
     },
     {
       "path": "../../util/atomic-write"

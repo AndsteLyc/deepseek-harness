@@ -9,7 +9,7 @@ Base class for services that expose a named API on `ctx`.
 
 Subclasses call `super(ctx, name)` from their constructor. The service is registered immediately and is automatically removed with the owning fiber.
 
-[Source](../../vendor/cordis/src/service.ts#L12)
+[Source](../../vendor/cordis/src/service.ts#L11)
 
 ### service.name
 
@@ -20,7 +20,7 @@ public name!: string
 
 The service name this instance is registered under.
 
-[Source](../../vendor/cordis/src/service.ts#L33)
+[Source](../../vendor/cordis/src/service.ts#L30)
 
 ## Static members
 
@@ -33,7 +33,7 @@ static readonly init: unique symbol
 
 Symbol key of an instance method run after construction (class plugins).
 
-[Source](../../vendor/cordis/src/service.ts#L14)
+[Source](../../vendor/cordis/src/service.ts#L13)
 
 ### Service.check
 
@@ -44,7 +44,18 @@ static readonly check: unique symbol
 
 Symbol key of the availability predicate passed to `ctx.provide()`.
 
-[Source](../../vendor/cordis/src/service.ts#L16)
+[Source](../../vendor/cordis/src/service.ts#L15)
+
+### Service.config
+
+```ts cordis-catalog
+/** Symbol key of the phantom intercept-config type parameter. */
+static readonly config: unique symbol
+```
+
+Symbol key of the phantom intercept-config type parameter.
+
+[Source](../../vendor/cordis/src/service.ts#L17)
 
 ### Service.invoke
 
@@ -55,18 +66,7 @@ static readonly invoke: unique symbol
 
 Symbol key of the call body making a service callable (e.g. `ctx.logger()`).
 
-[Source](../../vendor/cordis/src/service.ts#L18)
-
-### Service.metadata
-
-```ts cordis-catalog
-/** Symbol key of the phantom intercept-metadata type parameter. */
-static readonly metadata: unique symbol
-```
-
-Symbol key of the phantom intercept-metadata type parameter.
-
-[Source](../../vendor/cordis/src/service.ts#L20)
+[Source](../../vendor/cordis/src/service.ts#L19)
 
 ### Service.extend
 
@@ -77,7 +77,7 @@ static readonly extend: unique symbol
 
 Symbol key of the helper deriving an extended service instance.
 
-[Source](../../vendor/cordis/src/service.ts#L22)
+[Source](../../vendor/cordis/src/service.ts#L21)
 
 ### Service.tracker
 
@@ -88,26 +88,15 @@ static readonly tracker: unique symbol
 
 Symbol key of the tracker metadata used for context tracing.
 
-[Source](../../vendor/cordis/src/service.ts#L24)
+[Source](../../vendor/cordis/src/service.ts#L23)
 
-### Service.mergeIntercept
-
-```ts cordis-catalog
-/** Symbol key of the intercept-metadata merge hook below. */
-static readonly mergeIntercept: unique symbol
-```
-
-Symbol key of the intercept-metadata merge hook below.
-
-[Source](../../vendor/cordis/src/service.ts#L26)
-
-### Service.resolveIntercept
+### Service.resolveConfig
 
 ```ts cordis-catalog
-/** Symbol key of the intercept-metadata resolution helper below. */
-static readonly resolveIntercept: unique symbol
+/** Symbol key of the intercept-config resolution helper below. */
+static readonly resolveConfig: unique symbol
 ```
 
-Symbol key of the intercept-metadata resolution helper below.
+Symbol key of the intercept-config resolution helper below.
 
-[Source](../../vendor/cordis/src/service.ts#L28)
+[Source](../../vendor/cordis/src/service.ts#L25)

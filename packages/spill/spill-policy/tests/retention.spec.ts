@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { AttachmentId } from '@deepseek-ai/dsh-attachment/types'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import { retainContent, type RetainableBlock } from '../src/retention.ts'
 
 const text = (value: string): RetainableBlock => ({ type: 'text', text: value })
 const image = (name: string): RetainableBlock => ({
   type: 'image', attachment: {
-    attachmentId: brandString<AttachmentId>(`sha256:${name.repeat(64)}`), mediaType: 'image/png',
+    attachmentId: AttachmentId(`sha256:${name.repeat(64)}`), mediaType: 'image/png',
     width: 1, height: 1, bytes: 1,
   },
 })

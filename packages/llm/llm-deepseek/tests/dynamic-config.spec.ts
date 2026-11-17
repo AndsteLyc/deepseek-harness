@@ -4,9 +4,7 @@ import { access, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import LlmRuntime, { createUserMessage, INVALID_CREDENTIAL_CODE } from '@deepseek-ai/dsh-llm'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import AttachmentStore from '@deepseek-ai/dsh-attachment'
-import type { AttachmentId, ImageVariantId } from '@deepseek-ai/dsh-attachment/types'
+import AttachmentStore, { AttachmentId, ImageVariantId } from '@deepseek-ai/dsh-attachment'
 import type {
   ImageAttachmentLimits,
   ImageAttachmentRef,
@@ -32,7 +30,7 @@ declare module '@deepseek-ai/dsh-llm' {
 const configurations = new WeakMap<Context, Awaited<ReturnType<typeof liveConfig>>>()
 const KEY_REF = credentialRef('DEEPSEEK_API_KEY')
 const IMAGE_REF: ImageAttachmentRef = {
-  attachmentId: brandString<AttachmentId>(`sha256:${'a'.repeat(64)}`),
+  attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
   mediaType: 'image/png',
   bytes: 3,
   width: 1,
@@ -83,7 +81,7 @@ class StaticAttachmentStore extends AttachmentStore {
     _signal?: AbortSignal,
   ): Promise<RequestImageAttachment> {
     return Promise.resolve({
-      variantId: brandString<ImageVariantId>(`sha256:${'b'.repeat(64)}`),
+      variantId: ImageVariantId(`sha256:${'b'.repeat(64)}`),
       attachment: ref,
       data: Uint8Array.of(1, 2, 3),
       mediaType: ref.mediaType,

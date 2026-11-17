@@ -2,7 +2,6 @@
 import type { PtcProgramFormat } from '@deepseek-ai/dsh-ptc-runtime'
 import { createAsyncFunctionEvaluator } from './async-function.ts'
 import { createReplEvaluator } from './repl.ts'
-import { createScopedReplEvaluator } from './scoped-repl-evaluator.ts'
 import { createVmScriptEvaluator } from './vm-script.ts'
 import type { ProgramEvaluator, ProgramEvaluatorOptions, ProgramImportHandler } from './types.ts'
 
@@ -10,7 +9,6 @@ const evaluators: Record<PtcProgramFormat, (options: ProgramEvaluatorOptions) =>
   'function-body': createAsyncFunctionEvaluator,
   repl: createReplEvaluator,
   script: createVmScriptEvaluator,
-  'scoped-repl': createScopedReplEvaluator,
 }
 
 /**

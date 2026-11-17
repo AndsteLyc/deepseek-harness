@@ -4,9 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { fsHarness, waitForIdle } from './harness.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 /** Key-gated smoke for a real model driving the local read/write/edit tools. */
 
@@ -29,7 +28,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('fs tools with-key smoke', () => 
     ctx = await fsHarness(workdir, SYSTEM)
     // agentLoop.create prepares a session with no cwd, so the provider default
     // (config.cwd = workdir) is the workspace.
-    const agent = await ctx.agentLoop.create(brandString<SessionId>('fs-e2e'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
+    const agent = await ctx.agentLoop.create(SessionId('fs-e2e'), { provider: 'deepseek-official', model: 'deepseek-v4-flash' })
 
     agent.followup(createUserMessage({
       content: [{ type: 'text', text:
@@ -60,7 +59,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('fs tools with-key smoke', () => 
     try {
       ctx = await fsHarness(configDir, SYSTEM)
       const handle = await ctx.agents.create({
-        sessionId: brandString<SessionId>(`fs-e2e-cwd-${Date.now()}`),
+        sessionId: SessionId(`fs-e2e-cwd-${Date.now()}`),
         meta: { cwd: sessionDir },
         agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
       })

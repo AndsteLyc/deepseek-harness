@@ -1,17 +1,16 @@
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { SESSION_FORMAT_VERSION, type SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionEventMap, SessionEventType, SessionHeader } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { teamProjectionDefinition, teamProjectionView } from '../src/projection.ts'
 import type { TeamProjectionState, TeamState } from '../src/projection.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { TeamId, TeamMessageId, TeamTaskId } from '../src/types.ts'
+import { TeamId, TeamMessageId, TeamTaskId } from '../src/types.ts'
 import type { TeamMemberSnapshot, TeamMessageSnapshot, TeamTaskSnapshot } from '../src/types.ts'
 
-const ROOT = brandString<SessionId>('team-root')
-const TEAM = brandString<TeamId>(ROOT)
-const CHILD = brandString<SessionId>('child-a')
+const ROOT = SessionId('team-root')
+const TEAM = TeamId(ROOT)
+const CHILD = SessionId('child-a')
 
 function event<T extends Extract<SessionEventType, `team/${string}`>>(type: T, data: SessionEventMap[T], seq: SessionSeq): SessionEvent<T> {
   return { type, data, seq, time: seq } as unknown as SessionEvent<T>
@@ -51,7 +50,7 @@ function member(overrides: Partial<TeamMemberSnapshot> = {}): TeamMemberSnapshot
 
 function task(overrides: Partial<TeamTaskSnapshot> = {}): TeamTaskSnapshot {
   return {
-    id: brandString<TeamTaskId>('task-1'),
+    id: TeamTaskId('task-1'),
     revision: 1,
     subject: 'subject',
     description: 'description',
@@ -68,13 +67,13 @@ function catalog(childId: string, seq: number, description = `${childId} task`):
     type: 'subagent/catalog',
     seq: SessionSeq(seq),
     time: seq,
-    data: { version: 0, childId: brandString<SessionId>(childId), childCreatedAt: seq, mode: 'continuable', label: description },
+    data: { version: 0, childId: SessionId(childId), childCreatedAt: seq, mode: 'continuable', label: description },
   }
 }
 
 function message(overrides: Partial<TeamMessageSnapshot> = {}): TeamMessageSnapshot {
   return {
-    id: brandString<TeamMessageId>('message-1'),
+    id: TeamMessageId('message-1'),
     senderId: ROOT,
     senderName: 'lead',
     targetId: CHILD,
@@ -110,7 +109,7 @@ describe('Agent Teams projection events', () => {
 
   it('starts a fork with Team disabled and applies only its own mode selection', () => {
     const inherited = event('team/mode', { enabled: true }, SessionSeq(0))
-    const fork = project(brandString<SessionId>('fork'), [inherited], 1)
+    const fork = project(SessionId('fork'), [inherited], 1)
     expect(teamProjectionView(fork)).toEqual({ enabled: false, tasks: [] })
     const restored = teamProjectionDefinition.stateSchema.parse(JSON.parse(JSON.stringify(fork)))
     const enabled = teamProjectionDefinition.apply(restored, event('team/mode', { enabled: true }, SessionSeq(1)))
@@ -142,11 +141,11 @@ describe('Agent Teams projection events', () => {
     onTestFinished(() => ctx.fiber.dispose())
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.sessionProjections.register(teamProjectionDefinition)
-    const forkId = brandString<SessionId>('fork')
+    const forkId = SessionId('fork')
     const records = [event('team/mode', { enabled: true }, SessionSeq(0))]
     const restored = ctx.sessionProjections.restore(
       { agentTeam: { ver: 5, seq: SessionSeq(0), val: {
-        enabled: true, id: brandString<TeamId>(forkId), members: [], tasks: [], messages: [], delivered: [], nextTaskNumber: 1,
+        enabled: true, id: TeamId(forkId), members: [], tasks: [], messages: [], delivered: [], nextTaskNumber: 1,
       } } },
       records, SessionLogOffset(0),
       { version: SESSION_FORMAT_VERSION, id: forkId, createdAt: 0, isSeeded: true },
@@ -207,8 +206,8 @@ describe('Agent Teams projection events', () => {
       version: 2,
       teamId: TEAM,
       task: task({
-        id: brandString<TeamTaskId>('task-2'),
-        blockedBy: [brandString<TeamTaskId>('task-1')],
+        id: TeamTaskId('task-2'),
+        blockedBy: [TeamTaskId('task-1')],
       }),
     }, SessionSeq(1))
     const invalid: Array<{ records: SessionEvent[]; message: RegExp }> = [
@@ -216,7 +215,7 @@ describe('Agent Teams projection events', () => {
         records: [event('team/task', {
           version: 2,
           teamId: TEAM,
-          task: task({ blockedBy: [brandString<TeamTaskId>('missing')] }),
+          task: task({ blockedBy: [TeamTaskId('missing')] }),
         }, SessionSeq(0))],
         message: /blocker task "missing" .* is missing or deleted/,
       },
@@ -224,14 +223,14 @@ describe('Agent Teams projection events', () => {
         records: [event('team/task', {
           version: 2,
           teamId: TEAM,
-          task: task({ blockedBy: [brandString<TeamTaskId>('task-1')] }),
+          task: task({ blockedBy: [TeamTaskId('task-1')] }),
         }, SessionSeq(0))],
         message: /cannot block itself/,
       },
       {
         records: [first, event('team/task', {
           ...second.data,
-          task: { ...second.data.task, blockedBy: [brandString<TeamTaskId>('task-1'), brandString<TeamTaskId>('task-1')] },
+          task: { ...second.data.task, blockedBy: [TeamTaskId('task-1'), TeamTaskId('task-1')] },
         }, SessionSeq(1))],
         message: /repeats blocker/,
       },
@@ -239,7 +238,7 @@ describe('Agent Teams projection events', () => {
         records: [first, second, event('team/task', {
           version: 2,
           teamId: TEAM,
-          task: task({ revision: 2, blockedBy: [brandString<TeamTaskId>('task-2')] }),
+          task: task({ revision: 2, blockedBy: [TeamTaskId('task-2')] }),
         }, SessionSeq(2))],
         message: /dependency cycle/,
       },
@@ -262,7 +261,7 @@ describe('Agent Teams projection events', () => {
     const state = projectTeam(ROOT, [event('team/task', {
       version: 2,
       teamId: TEAM,
-      task: task({ id: brandString<TeamTaskId>('external-task') }),
+      task: task({ id: TeamTaskId('external-task') }),
     }, SessionSeq(0))])
     expect(state.nextTaskNumber).toBe(1)
   })
@@ -271,7 +270,7 @@ describe('Agent Teams projection events', () => {
     expect(() => projectTeam(ROOT, [event('team/task', {
       version: 2,
       teamId: TEAM,
-      task: task({ id: brandString<TeamTaskId>('task-9007199254740992') }),
+      task: task({ id: TeamTaskId('task-9007199254740992') }),
     }, SessionSeq(0))])).toThrow(/persisted Agent Teams team\/task payload is invalid/)
   })
 
@@ -309,7 +308,7 @@ describe('Agent Teams projection events', () => {
     const header: SessionHeader = { version: SESSION_FORMAT_VERSION, id: ROOT, createdAt: 0, isSeeded: false }
     const records = [
       event('team/member', { version: 2, teamId: TEAM, member: member({ phase: 'active' }) }, SessionSeq(0)),
-      event('team/message/delivered', { version: 2, teamId: TEAM, messageId: brandString<TeamMessageId>('message-1'), targetId: CHILD }, SessionSeq(1)),
+      event('team/message/delivered', { version: 2, teamId: TEAM, messageId: TeamMessageId('message-1'), targetId: CHILD }, SessionSeq(1)),
       event('team/task', { version: 2, teamId: TEAM, task: task() }, SessionSeq(2)),
       event('team/mode', { enabled: false }, SessionSeq(3)),
       event('team/message/queued', { version: 2, teamId: TEAM, message: message() }, SessionSeq(4)),
@@ -392,7 +391,7 @@ describe('Agent Teams projection events', () => {
   it('isolates unsupported inherited Team records from the current Team', () => {
     const inherited = event('team/task', {
       version: 1 as 2,
-      teamId: brandString<TeamId>('ancestor'),
+      teamId: TeamId('ancestor'),
       task: task(),
     }, SessionSeq(0))
     const projected = project(ROOT, [inherited])
@@ -401,12 +400,18 @@ describe('Agent Teams projection events', () => {
   })
 
   it('ignores malformed current-version records inherited from another Team', () => {
-    const inherited = event('team/task', {
-      version: 2,
-      teamId: brandString<TeamId>('ancestor'),
-      task: task(),
-    }, SessionSeq(0))
-    Reflect.set(inherited.data.task, 'subject', 42)
+    const inherited = {
+      ...event('team/task', {
+        version: 2,
+        teamId: TeamId('ancestor'),
+        task: task(),
+      }, SessionSeq(0)),
+      data: {
+        version: 2,
+        teamId: TeamId('ancestor'),
+        task: { ...task(), subject: 42 },
+      },
+    } as unknown as SessionEvent
     expect(projectTeam(ROOT, [inherited]).tasks).toEqual([])
   })
 
@@ -422,7 +427,7 @@ describe('Agent Teams projection events', () => {
     const taskEvent = event('team/task', { version: 2, teamId: TEAM, task: task() }, SessionSeq(1))
     const queuedEvent = event('team/message/queued', { version: 2, teamId: TEAM, message: message() }, SessionSeq(2))
     const deliveredEvent = event('team/message/delivered', {
-      version: 2, teamId: TEAM, messageId: brandString<TeamMessageId>('message-1'), targetId: CHILD,
+      version: 2, teamId: TEAM, messageId: TeamMessageId('message-1'), targetId: CHILD,
     }, SessionSeq(3))
 
     it('keeps unrelated events unchanged and replaces tasks without mutating prior state', () => {
@@ -455,13 +460,13 @@ describe('Agent Teams projection events', () => {
         version: 2, teamId: TEAM, task: task({ revision: 2, status: 'in_progress', ownerId: CHILD, writeScopes: ['src'] }),
       }, SessionSeq(2))
       const blocked = event('team/task', {
-        version: 2, teamId: TEAM, task: task({ id: brandString<TeamTaskId>('task-2'), blockedBy: [brandString<TeamTaskId>('task-1')], writeScopes: ['src/web'] }),
+        version: 2, teamId: TEAM, task: task({ id: TeamTaskId('task-2'), blockedBy: [TeamTaskId('task-1')], writeScopes: ['src/web'] }),
       }, SessionSeq(3))
       const leadOwned = event('team/task', {
-        version: 2, teamId: TEAM, task: task({ id: brandString<TeamTaskId>('task-3'), revision: 1, status: 'in_progress', ownerId: ROOT }),
+        version: 2, teamId: TEAM, task: task({ id: TeamTaskId('task-3'), revision: 1, status: 'in_progress', ownerId: ROOT }),
       }, SessionSeq(4))
       const deleted = event('team/task', {
-        version: 2, teamId: TEAM, task: task({ id: brandString<TeamTaskId>('task-3'), revision: 2, status: 'deleted', ownerId: ROOT }),
+        version: 2, teamId: TEAM, task: task({ id: TeamTaskId('task-3'), revision: 2, status: 'deleted', ownerId: ROOT }),
       }, SessionSeq(5))
       const state = project(ROOT, [memberEvent, activeMember, taskEvent, claimed, blocked, leadOwned, deleted])
       const view = teamProjectionView(state)
@@ -485,7 +490,7 @@ describe('Agent Teams projection events', () => {
       const withMail = teamProjectionDefinition.apply(state, { ...queuedEvent, seq: SessionSeq(6) })
       expect(teamProjectionView(withMail)).toBe(view)
       const withMember = teamProjectionDefinition.apply(withMail, event('team/member', {
-        version: 2, teamId: TEAM, member: member({ id: brandString<SessionId>('child-b'), name: 'worker-b' }),
+        version: 2, teamId: TEAM, member: member({ id: SessionId('child-b'), name: 'worker-b' }),
       }, SessionSeq(7)))
       expect(teamProjectionView(withMember)).toBe(view)
       expect(withMember).toBe(state)
@@ -513,7 +518,7 @@ describe('Agent Teams projection events', () => {
         published.push({ session: session.id, key, value })
       })
       const lead = ctx.sessions.create(ROOT)
-      const other = ctx.sessions.create(brandString<SessionId>('other-root'))
+      const other = ctx.sessions.create(SessionId('other-root'))
       expect(ctx.sessionProjections.snapshot(lead).values['agentTeam']).toEqual({
         enabled: false,
         tasks: [],
@@ -531,7 +536,7 @@ describe('Agent Teams projection events', () => {
       lead.append('turn/start', { turn: 1 })
       expect(published).toHaveLength(1)
 
-      other.append('team/task', { version: 2, teamId: brandString<TeamId>(other.id), task: task() })
+      other.append('team/task', { version: 2, teamId: TeamId(other.id), task: task() })
       expect(published).toHaveLength(2)
       expect(published[1]).toMatchObject({
         session: other.id,

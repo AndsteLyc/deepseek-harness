@@ -75,7 +75,6 @@
     "picomatch": "^4.0.7"
   },
   "devDependencies": {
-    "@deepseek-ai/dsh-brand": "workspace:*",
     "@deepseek-ai/cordis": "workspace:~",
     "@deepseek-ai/dsh-agent": "workspace:*",
     "@deepseek-ai/dsh-agent-loop-testkit": "workspace:*",
@@ -118,8 +117,7 @@
     "@deepseek-ai/dsh-session-projection-cache": "workspace:*",
     "@deepseek-ai/dsh-session-query": "workspace:*",
     "@deepseek-ai/dsh-api-remote-access": "workspace:*",
-    "@types/picomatch": "^4.0.3",
-    "@deepseek-ai/dsh-brand": "workspace:*"
+    "@types/picomatch": "^4.0.3"
   },
   "files": [
     "locale/*.json",

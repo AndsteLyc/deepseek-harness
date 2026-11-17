@@ -7,11 +7,10 @@ import { pathToFileURL } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import Lsp, { LspError, type LspProviderId, type LspProvider, type LspProviderQuery, type LspQueryResult } from '@deepseek-ai/dsh-lsp'
+import Lsp, { LspError, LspProviderId, type LspProvider, type LspProviderQuery, type LspQueryResult } from '@deepseek-ai/dsh-lsp'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
 import { DEFAULT_LSP_TOOL_TIMEOUT_MS, LSP_PROMPT_TEXT } from '@deepseek-ai/dsh-tool-lsp'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 /** A scripted provider recording queries; `respond` yields the result or throws. */
 function stubProvider(
@@ -20,7 +19,7 @@ function stubProvider(
 ): LspProvider & { seen: LspProviderQuery[] } {
   const seen: LspProviderQuery[] = []
   return {
-    id: brandString<LspProviderId>('stub'),
+    id: LspProviderId('stub'),
     extensionToLanguage,
     seen,
     query(request) {
@@ -240,7 +239,7 @@ describe('tool-lsp execution', () => {
   it('forwards exec.signal to the seam query', async () => {
     const seen: (AbortSignal | undefined)[] = []
     const provider: LspProvider = {
-      id: brandString<LspProviderId>('sig'),
+      id: LspProviderId('sig'),
       extensionToLanguage: { '.ts': 'typescript' },
       query(_request, signal) {
         seen.push(signal)

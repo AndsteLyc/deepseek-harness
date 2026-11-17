@@ -6,9 +6,9 @@ import { withFileLock } from '@deepseek-ai/dsh-atomic-write'
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type { ComputerUseProviderName } from '@deepseek-ai/dsh-computer-use/types'
+import { ComputerUseProviderName } from '@deepseek-ai/dsh-computer-use/brand'
 import { admitEncodedImages } from '@deepseek-ai/dsh-attachment'
-import type { ImageAttachmentRef, ImageRequestTarget } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { z } from 'zod'
@@ -20,37 +20,27 @@ import { ApplicationAuthorizationResult, installCuaAccess } from './access.ts'
 import type { CuaApplicationGrant, CuaApplicationId, CuaSystemPermission } from './access-types.ts'
 import type { CuaAppHandle, CuaOperation, CuaStartupCapabilities } from './types.ts'
 import { ApplicationIcon, AppResult, NativeScreenshotResult, Request, SystemPointerRequest, ScreenshotResult } from './protocol.ts'
-import { CuaConfigFields, type CuaScreenshotTargetConfig, type CuaStandaloneRunCodeConfig } from './config.ts'
-import { fixedScreenshotTarget, installCuaTools } from './tool-registration.ts'
+import { CuaConfigFields } from './config.ts'
 import { CuaCoordinates } from './coordinates.ts'
 import { observeNativeWindows } from './native-observation.ts'
-import { ToolArgsError, ToolContextUnavailableError, type ToolDefinition, type ToolExecution } from '@deepseek-ai/dsh-tools'
+import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
+import type { PromptSection } from '@deepseek-ai/dsh-system-prompt'
+import type { ToolDefinition, ToolExecution } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-computer-use'
 import type {} from '@deepseek-ai/dsh-ptc-runtime'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 export { CuaAccess } from './access.ts'
 export type { CuaStartupCapabilities } from './types.ts'
-export type { CuaPrograms } from './tool-registration.ts'
 
 /** Native executable and per-operation resource bounds. */
 export interface CuaConfig {
-  /** Ask once per live Session before explicitly requested system-pointer moves or drags. */
+  /** Ask once per live Session before an explicitly requested system-pointer move. */
   requireSystemPointerApproval: boolean
-  /**
-   * Preset receiving raw cua; every other Agent, with or without a preset, receives cua_run_code while its
-   * program services are available. False registers raw cua globally.
-   */
+  /** Register tools for Agents using this preset; defaults to ptc. False enables global registration. */
   agentPreset: string | false
-  /** Dedicated persistent program limits, independent of the profile's PTC runtime. */
-  standaloneRunCode: CuaStandaloneRunCodeConfig
-  /**
-   * Fixed request-image target for screenshots. Omission resolves the target from the Agent's model
-   * route and refuses capture when that route declares no image input.
-   */
-  screenshotTarget?: CuaScreenshotTargetConfig | undefined
   /** Legacy grants imported once into profile-scoped storage; later edits are ignored. */
   allowedApps: Array<Omit<CuaApplicationGrant, 'id'> & {
     /** Unbranded digest at the profile configuration boundary; admitted by the Config schema. */
@@ -99,37 +89,8 @@ export const CuaConfig = Schema.object(CuaConfigFields) satisfies Schema<Record<
 
 
 function executionAgent(execution: Readonly<ToolExecution>): Agent {
-  if (!execution.agent) throw new ToolContextUnavailableError('dsh-cua requires an agent-owned execution')
+  if (!execution.agent) throw new Error('dsh-cua requires an agent-owned execution')
   return execution.agent
-}
-
-/**
- * Describe one request issue for the model. A union that no accepted form matches lists each form's own
- * issues, so the model learns which field to add or remove, such as a missing `params.y`.
- * @param issue - one issue from parsing the request.
- * @param base - path of the value the issue belongs to.
- * @returns a single-line violation naming the field and the reason.
- */
-function requestViolation(issue: z.core.$ZodIssue, base: readonly PropertyKey[] = []): string {
-  const path = [...base, ...issue.path]
-  const field = path.length > 0 ? path.map(String).join('.') : 'arguments'
-  if (issue.code !== 'invalid_union' || issue.errors.length === 0) return `${field}: ${issue.message}`
-  const forms = issue.errors.map(form => `(${form.map(nested => requestViolation(nested, path)).join('; ')})`)
-  return `${field}: matches none of the accepted forms: ${forms.join(' or ')}`
-}
-
-/** Parse the tool request; refinements the parameter schema cannot express fail as argument errors. */
-function parseRequest<T>(schema: z.ZodType<T>, args: unknown): T {
-  const parsed = schema.safeParse(args)
-  if (!parsed.success) throw new ToolArgsError(parsed.error.issues.map(issue => requestViolation(issue)))
-  return parsed.data
-}
-
-/** Native cancellation after the caller cancelled keeps its diagnostic; the tool registry records it as `ABORTED`. */
-function callerCancelled(error: NativeError): Error {
-  const cancelled = new Error(error.message, { cause: error })
-  cancelled.name = 'AbortError'
-  return cancelled
 }
 
 interface CuaExecution extends ToolExecution {
@@ -138,8 +99,6 @@ interface CuaExecution extends ToolExecution {
   coordinates: CuaCoordinates
 }
 
-
-const nativeDiscoveryRows = z.array(z.record(z.string(), z.json()))
 
 type ScreenshotValue = z.infer<typeof ScreenshotResult> & { attachment: { [K in keyof ImageAttachmentRef]: ImageAttachmentRef[K] } }
 
@@ -150,26 +109,19 @@ function renderResult(args: unknown, value: JsonValue): ContentBlock[] {
   return [{ type: 'text', text: JSON.stringify(metadata) }, { type: 'image', attachment }]
 }
 
-/** Resolve the attachment store and the request-image target before requesting a screenshot. */
-async function screenshotStore(ctx: Context, execution: Readonly<CuaExecution>, configured: CuaScreenshotTargetConfig | undefined) {
+/** Resolve the exact calling model and attachment store before requesting a screenshot. */
+async function screenshotStore(ctx: Context, execution: Readonly<CuaExecution>) {
   const attachments = ctx.get('attachments')
-  if (!attachments) throw new ToolContextUnavailableError('CUA screenshots require an attachment store')
-  if (configured !== undefined) {
-    return { attachments, target: (image: ImageAttachmentRef): ImageRequestTarget => fixedScreenshotTarget(configured, image) }
-  }
+  if (!attachments) throw new Error('CUA screenshots require an attachment store')
   const agent = execution.agent
   const routed = agent.session.requestHeader()?.config
   const provider = routed?.provider ?? agent.options.provider
   const model = routed?.model ?? agent.options.model
   const llm = ctx.get('llm')
-  if (provider === undefined || model === undefined || llm === undefined) {
-    throw new ToolContextUnavailableError('CUA screenshot model route could not be resolved')
-  }
+  if (provider === undefined || model === undefined || llm === undefined) throw new Error('CUA screenshot model route could not be resolved')
   const info = await llm.resolveModelInfo(provider, model, execution.signal)
   execution.signal.throwIfAborted()
-  if (!info.inputModalities?.includes('image')) {
-    throw new NativeError('MODEL_DOES_NOT_SUPPORT_IMAGES', `CUA screenshots require model "${model}" to declare image input`)
-  }
+  if (!info.inputModalities?.includes('image')) throw new Error(`CUA screenshots require model "${model}" to declare image input`)
   return { attachments, target: (image: ImageAttachmentRef) => llm.imageRequestTarget(provider, model, image) }
 }
 
@@ -177,15 +129,8 @@ async function screenshotStore(ctx: Context, execution: Readonly<CuaExecution>, 
 export interface CuaBackend {
   helperPath: string
   createChannel: NativeChannelFactory
-  /**
-   * Select platform operation instructions for the exposed tool form.
-   * @param kind Raw cua calls or standalone cua_run_code programs.
-   * @returns Instructions before shared capability guidance and configured limits are added.
-   */
-  getGuidance(kind: 'raw' | 'standalone'): string
+  guidance: string
   capabilities: CuaStartupCapabilities
-  /** Preserve discovery PIDs when getApp accepts a decimal PID as an exact process selector. */
-  acceptsPidSelector?: boolean
   /** Dispatch a directional key through the provider's execution-scoped input owner, after application authorization. */
   sendKeyEvent?: (client: NativeClient, params: Record<string, JsonValue>,
     execution: Readonly<ToolExecution>) => Promise<JsonValue>
@@ -210,12 +155,8 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
   const systemPointer = backend.capabilities.systemPointer === true
   const mouseControl = systemPointer ? new MouseControl(ctx, config.requireSystemPointerApproval) : undefined
   const requestSchema = systemPointer ? SystemPointerRequest : Request
-  const formatGuidance = (text: string): string => {
-    const instructions = systemPointer ? withSystemPointerGuidance(text) : text
-    return `${instructions}\n\nAX read defaults: maxElements=${config.maxElements}, maxDepth=${config.maxDepth}.\n\nMaximum click holdMs: ${config.maxClickHoldMs} ms.`
-  }
-  const guidance = formatGuidance(backend.getGuidance('raw'))
-  const programGuidance = formatGuidance(backend.getGuidance('standalone'))
+  const instructions = systemPointer ? withSystemPointerGuidance(backend.guidance) : backend.guidance
+  const guidance = `${instructions}\n\nAX read defaults: maxElements=${config.maxElements}, maxDepth=${config.maxDepth}.\n\nMaximum click holdMs: ${config.maxClickHoldMs} ms.`
   const native: NativeClientConfig = {
     helperPath, cwd: process.cwd(), timeoutMs: config.timeoutMs, axTimeoutMs: config.axTimeoutMs,
     connectTimeoutMs: config.connectTimeoutMs, screenshotTimeoutMs: config.screenshotTimeoutMs,
@@ -238,7 +179,7 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
   }>()
   const closedOwners = new WeakSet<Agent>()
   function ownerFor(agent: Agent) {
-    if (closedOwners.has(agent) || ctx.agents.get(agent.id) !== agent) throw new ToolContextUnavailableError('dsh-cua agent has been disposed')
+    if (closedOwners.has(agent) || ctx.agents.get(agent.id) !== agent) throw new Error('dsh-cua agent has been disposed')
     const existing = ownerCleanups.get(agent)
     if (existing) return existing
     const controller = new AbortController()
@@ -263,7 +204,7 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
     return owner
   }
   ctx.effect(function* () {
-    yield ctx.computerUse.register(brandString<ComputerUseProviderName>('dsh-cua'))
+    yield ctx.computerUse.register(ComputerUseProviderName('dsh-cua'))
     yield async () => {
       lifetime.abort()
       const permissions = Promise.allSettled([access.dispose()])
@@ -282,9 +223,7 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
       const signal = execution.signal
       signal.throwIfAborted()
       const client = execution.nativeClient
-      // Released macOS helpers accept an explicit false for mouseMove but reject the new drag field.
-      if (method === 'drag' && !useSystemPointer) delete params.useSystemPointer
-      else if (useSystemPointer !== undefined) params.useSystemPointer = useSystemPointer
+      if (useSystemPointer !== undefined) params.useSystemPointer = useSystemPointer
       if (method === 'sendKeyEvent' && backend.sendKeyEvent) return backend.sendKeyEvent(client, params, execution)
       const nativeParams = method === 'findApps'
         ? { ...params, maxAppMatches: config.maxAppMatches }
@@ -297,7 +236,7 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
               : params
       const requestNative = () => client.request(method, nativeParams, signal, execution.callId)
       if (method === 'screenshot') {
-        const { attachments, target } = await screenshotStore(ctx, execution, config.screenshotTarget)
+        const { attachments, target } = await screenshotStore(ctx, execution)
         const screenshot = NativeScreenshotResult.parse(await requestNative())
         if (screenshot.windowId !== parsedParams.windowId) throw new NativeError('NATIVE_PROTOCOL', 'Native screenshot belongs to another window')
         signal.throwIfAborted()
@@ -314,17 +253,13 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
         }
         const refs = await stage('image admission', () => admitEncodedImages(attachments, [{ data: screenshot.data, mediaType: screenshot.mimeType }]))
         signal.throwIfAborted()
-        let attachment = refs[0] as ImageAttachmentRef
+        const attachment = refs[0] as ImageAttachmentRef
         const original = attachment.originalDimensions ?? attachment
         if (original.width !== screenshot.pixelWidth || original.height !== screenshot.pixelHeight) {
           throw new NativeError('NATIVE_PROTOCOL', 'Native screenshot dimensions disagree with its decoded image')
         }
         const image = await stage('model image preparation', () => attachments.readImageRequest(attachment, target(attachment), signal))
         signal.throwIfAborted()
-        if (image.width !== attachment.width || image.height !== attachment.height) {
-          attachment = await stage('image storage', () => attachments.saveImage({ data: image.data, mediaType: image.mediaType }))
-          signal.throwIfAborted()
-        }
         execution.coordinates.screenshot(parsedParams.appHandle as CuaAppHandle, screenshot.windowId, screenshot.bounds, image)
         return { ...screenshot, mimeType: image.mediaType, data: Buffer.from(image.data).toString('base64'),
           pixelWidth: image.width, pixelHeight: image.height, coordinateSpace: 'screenshot-pixels', attachment }
@@ -347,9 +282,6 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
         return selected
       }
       signal.throwIfAborted()
-      if ((method === 'listApps' || method === 'findApps') && !backend.acceptsPidSelector) {
-        return nativeDiscoveryRows.parse(result).map(({ pid: _pid, ...record }) => record)
-      }
       if (method === 'getCapabilities') {
         const runtime = z.record(z.string(), z.json()).parse(result)
         const capabilities = backend.capabilities
@@ -374,7 +306,7 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
       parameters: { ...z.record(z.string(), z.json()).parse(z.toJSONSchema(requestSchema)), type: 'object' },
       output: { schema: {}, render: renderResult },
       async execute(args, execution) {
-        const request = parseRequest(requestSchema, args)
+        const request = requestSchema.parse(args)
         const agent = executionAgent(execution)
         execution.signal.throwIfAborted()
         lifetime.signal.throwIfAborted()
@@ -407,7 +339,7 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
             owner.coordinates = new CuaCoordinates()
           }
           const nativeClient = client
-          const route = request.method === 'mouseMove' || request.method === 'drag'
+          const route = request.method === 'mouseMove'
             ? mouseControl?.resolve(agent, 'useSystemPointer' in request.params && request.params.useSystemPointer === true)
             : undefined
           if (route?.prepare) owner.coordinates.parameters(request)
@@ -424,15 +356,58 @@ export function installCua(ctx: Context, config: CuaConfig, backend: CuaBackend)
         pending.set(operation, agent)
         try {
           return await operation
-        } catch (error) {
-          if (execution.signal.aborted && error instanceof NativeError && error.code === 'NATIVE_CANCELLED') throw callerCancelled(error)
-          throw error
         } finally {
           pending.delete(operation)
         }
       },
     }
-    yield installCuaTools(ctx, config, tool, guidance, programGuidance)
+    const prompt: PromptSection = {
+      name: 'computer-use:dsh-cua', order: ctx.systemPrompt.getSectionOrder('TOOL_COMPUTER_USE'),
+      text: () => {
+        const runtime = ctx.get('ptcRuntime')
+        return !runtime?.retainsState ? guidance : `${guidance}
+
+Persistent PTC initialization:
+
+\`\`\`ts
+var { connectCua } = await import(${JSON.stringify(new URL('../lib/bridge.js', import.meta.url).href)});
+var cua = connectCua(() => tools.cua, text => console.log(text));
+\`\`\``
+      },
+    }
+    const register = (scope: Context): void => {
+      scope.tools.register(tool)
+      scope.systemPrompt.section(prompt)
+    }
+    if (config.agentPreset === false) register(ctx)
+    else {
+      const consumer = ctx.inject(['agentPresets'], async (presetCtx) => {
+        const scopes = new Map<Agent, Scope>()
+        const sync = async (agent: Agent): Promise<void> => {
+          const previous = scopes.get(agent)
+          if (presetCtx.agentPresets.composedPreset(agent.ctx) !== config.agentPreset) {
+            scopes.delete(agent)
+            await previous?.dispose()
+            return
+          }
+          if (previous !== undefined) return
+          const scope = createScope(agent.ctx, agent)
+          scopes.set(agent, scope)
+          scope.ctx.effect(() => () => {
+            if (scopes.get(agent) === scope) scopes.delete(agent)
+          }, 'cua.agent-tools')
+          register(scope.ctx)
+        }
+        presetCtx.effect(() => async () => { await Promise.all([...scopes.values()].map(scope => scope.dispose())) }, 'cua.agent-tools')
+        presetCtx.on('agent/created', async ({ agent }) => { await sync(agent) })
+        presetCtx.on('agent-preset/selected', (id) => {
+          const agent = presetCtx.agents.get(id)
+          if (agent !== undefined) void sync(agent).catch((error: unknown) => { presetCtx.logger.warn(`CUA tool scope update failed: ${String(error)}`) })
+        })
+        await Promise.all(presetCtx.agents.list().map(sync))
+      })
+      yield () => consumer.dispose()
+    }
   }, 'dsh-cua.runtime')
 }
 

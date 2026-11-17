@@ -7,15 +7,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AttachmentStore, { AttachmentError } from '@deepseek-ai/dsh-attachment'
 import type { MessageId } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import SubagentRuntime, {
   SubagentError,
-  type SubagentErrorCode,
   type SubagentPromptRequestId,
 } from '@deepseek-ai/dsh-subagent'
 import { subagentManager } from './manager-internals.ts'
 import type { PeerId, Principal, RemoteInvocation } from '@deepseek-ai/dsh-typert-protocol'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface PrincipalMap {
@@ -24,8 +22,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
   }
 }
 
-const PARENT = brandString<SessionId>('parent')
-const CHILD = brandString<SessionId>('child')
+const PARENT = SessionId('parent')
+const CHILD = SessionId('child')
 const PARENT_CREATED_AT = 1
 const REQUEST_ID = 'req-1' as SubagentPromptRequestId
 const GUEST: Principal = { kind: 'test-guest', guest: 'subagent' }
@@ -89,7 +87,7 @@ describe('subagent prompt Remote', () => {
     const { ctx, subagents } = await bench({ [PARENT]: { status: 'idle' } })
     const delivery = promptDelivery(ctx)
 
-    await expect(subagents.prompt({ ...promptRequest(), childSessionId: brandString<SessionId>('') }, signal))
+    await expect(subagents.prompt({ ...promptRequest(), childSessionId: SessionId('') }, signal))
       .rejects.toMatchObject(emptyIdFailure('subagent.prompt', 'childSessionId'))
     expect(delivery).not.toHaveBeenCalled()
   })
@@ -253,7 +251,7 @@ describe('subagent prompt Remote', () => {
   it('maps each admission failure onto its stable code and hides the rest', async () => {
     const { ctx, subagents } = await bench({ [PARENT]: { status: 'idle' } })
     const delivery = promptDelivery(ctx)
-    const cases: readonly [SubagentErrorCode, string][] = [
+    const cases: readonly [string, string][] = [
       ['NOT_RESUMABLE', 'subagent/not-resumable'],
       ['UNAUTHORIZED', 'subagent/unauthorized'],
       ['DRAINING', 'subagent/delivery-unavailable'],
@@ -298,7 +296,7 @@ describe('subagent interrupt Remote', () => {
   it('rejects an empty child id before interrupting', async () => {
     const { subagents } = await bench()
     const interrupt = vi.spyOn(subagents, 'interrupt')
-    expect(() => subagents.interruptByUser(brandString<SessionId>('')))
+    expect(() => subagents.interruptByUser(SessionId('')))
       .toThrow(expect.objectContaining(emptyIdFailure('subagent.interrupt', 'childSessionId')))
     expect(interrupt).not.toHaveBeenCalled()
   })

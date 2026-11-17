@@ -67,10 +67,12 @@ describe.skipIf(!existsSync(builtHost))('built Desktop Host Office resources', (
       const primaryRuntime = mode === 'relative-source' ? 'runtime/primary-runtime' : join(runtime, 'primary-runtime')
       host = new DesktopHostProcess(process.execPath, project, paths.profile, undefined,
         process.env, (error) => { failures.push(error) }, primaryRuntime)
-      const { url, authenticationCookie: cookie } = await host.start()
-      const response = await fetch(url, { headers: { cookie }, redirect: 'manual' })
+      const { url } = await host.start()
+      // The authenticated URL exchanges its token for a session cookie by redirecting.
+      const response = await fetch(url, { redirect: 'manual' })
       await response.body?.cancel()
-      expect(response.status).toBe(200)
+      expect(response.status).toBe(303)
+      const cookie = response.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
       const probe = await fetch(new URL(`/${SKILL_PROBE}`, url), { headers: { cookie } })
       const body = await probe.text()
       expect(probe.status, body).toBe(200)

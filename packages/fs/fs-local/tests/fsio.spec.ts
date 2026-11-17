@@ -27,8 +27,7 @@ import {
 } from '../src/fsio.ts'
 import type { LocalTarget } from '../src/fsio.ts'
 import { copyFileDaclWin32, readFileDaclWin32 } from '../src/win32.ts'
-import { FsError, type FsTargetKey } from '@deepseek-ai/dsh-fs'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { FsError, FsTargetKey } from '@deepseek-ai/dsh-fs'
 
 let dir: string
 beforeEach(async () => {
@@ -38,7 +37,7 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
 })
 
-const localTarget = (path: string): LocalTarget => ({ displayPath: path, targetKey: brandString<FsTargetKey>(path) })
+const localTarget = (path: string): LocalTarget => ({ displayPath: path, targetKey: FsTargetKey(path) })
 
 async function collect(chunks: AsyncIterable<string>): Promise<string> {
   let out = ''

@@ -9,13 +9,12 @@ import * as CommandGoal from '@deepseek-ai/dsh-command-goal'
 import CommandRuntime from '@deepseek-ai/dsh-commands'
 import GoalService from '@deepseek-ai/dsh-goal'
 import * as GoalDriver from '@deepseek-ai/dsh-goal-round-driver'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import * as GoalTools from '@deepseek-ai/dsh-tool-goal'
 import { expect, it } from 'vitest'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import { HarnessSdkJsonRpcServer } from '../src/server.ts'
 import { modelInput } from './command-model-input.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 async function scenario(path: 'sdk' | 'native', cwd: string) {
   const ctx = new Context()
@@ -34,7 +33,7 @@ async function scenario(path: 'sdk' | 'native', cwd: string) {
       notify: () => {}, request: async () => { throw new Error('Goal commands must not request client input') },
     })
     await server.initialize({ cwd, provider: 'goal-parity', model: 'model', maxTokens: 123 })
-    const sessionId = brandString<SessionId>('goal-parity')
+    const sessionId = SessionId('goal-parity')
     await server.prompt({ sessionId, contentBlocks: [{ type: 'text', text: 'Begin the same task.' }] })
     await server.wait({ sessionId })
     const agent = ctx.agents.get(sessionId)

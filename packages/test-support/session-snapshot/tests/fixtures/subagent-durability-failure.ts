@@ -1,7 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SubagentPromptRequestId } from '@deepseek-ai/dsh-subagent'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 export const name = 'subagent-durability-failure'
 export const inject = ['agents', 'sessionPersistence', 'subagents']
@@ -105,7 +104,7 @@ export function apply(ctx: Context): void {
   const deliver = subagents.sendMessage.bind(subagents)
   subagents.sendMessage = (authority, childId, content, options) => {
     const mapped = childId === PLACEHOLDER_CHILD_ID && realChildId !== undefined
-      ? brandString<SessionId>(realChildId)
+      ? SessionId(realChildId)
       : childId
     return deliver(authority, mapped, content, options)
   }
@@ -129,7 +128,7 @@ export function apply(ctx: Context): void {
       await subagents.prompt({
         requestId: 'snapshot-human-steer' as SubagentPromptRequestId,
         parentSessionId: agent.session.header.parentSession,
-        childSessionId: brandString<SessionId>(agent.session.header.id),
+        childSessionId: SessionId(agent.session.header.id),
         mode: 'continuable',
         delivery: 'steer',
         content: [{ type: 'text', text: 'Human priority: keep the requested exact reply.' }],

@@ -17,7 +17,8 @@ import type { SessionEvent, SessionHeader, SessionId, ToolResultMessage, UserMes
 import type { SessionLineageNode } from '@deepseek-ai/dsh-session-query'
 import { SessionPersistenceNotFoundError } from '@deepseek-ai/dsh-session-persistence'
 import type { SessionAccess, SessionHandle } from '@deepseek-ai/dsh-session-persistence'
-import { ConnectionAuthentication, HostConnectionService } from '@deepseek-ai/dsh-client-connection'
+import { HostConnectionService } from '@deepseek-ai/dsh-client-connection'
+import type { BrowserAuth } from '@deepseek-ai/dsh-client-connection/src/browser-auth.ts'
 import * as SessionLogExport from '../src/index.ts'
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -171,8 +172,7 @@ async function buildApi(
     } as never)
   }
   if (services.sessions !== undefined) ctx.provide('sessions', services.sessions as never)
-  new ConnectionAuthentication(ctx)
-  const connection = new HostConnectionService(ctx, [])
+  const connection = new HostConnectionService(ctx, [], {} as BrowserAuth)
   const fiber = ctx.plugin(SessionLogExport, {
     ...services.compressionLevel === undefined
       ? {}

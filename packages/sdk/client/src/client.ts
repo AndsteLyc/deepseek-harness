@@ -25,8 +25,7 @@ import {
   type SdkPromptContentBlock,
   type SdkUserQuestionRequest,
 } from '@deepseek-ai/dsh-sdk-protocol'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import { type SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
+import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { disposeRuntimeProcess } from './dispose.ts'
 import { resolveDshLaunch, type RuntimeProcessOptions } from './launch.ts'
 import type { HarnessClientOptions, HarnessNotification, NotificationFilter } from './types.ts'
@@ -594,7 +593,7 @@ export async function queryInput(
   input: string | SdkPromptContentBlock[],
 ): Promise<SessionQueryResult> {
   const params: SessionQueryParams = {
-    sessionId: brandString<SessionId>(sessionId), contentBlocks: normalizeInput(input),
+    sessionId: SessionId(sessionId), contentBlocks: normalizeInput(input),
   }
   const value = await client.request('session/query', params)
   if (isRecord(value)) {

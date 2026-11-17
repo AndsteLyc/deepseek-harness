@@ -9,16 +9,10 @@
   ],
   "references": [
     {
-      "path": "../../util/brand"
-    },
-    {
       "path": "../../../vendor/cordis"
     },
     {
       "path": "../../../vendor/schemastery"
-    },
-    {
-      "path": "../../util/error"
     },
     {
       "path": "../../core/agent"

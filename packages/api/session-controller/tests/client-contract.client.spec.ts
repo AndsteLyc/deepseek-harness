@@ -5,8 +5,7 @@ import {
   MutableSessionEventSource, type SessionAssistantSettlementEntry,
   type SessionLiveEventEntry, type SessionTransientEventEntry,
 } from '../src/client/contract/events.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { LlmAttemptId } from '@deepseek-ai/dsh-llm/types'
+import { LlmAttemptId } from '@deepseek-ai/dsh-llm/brand'
 import type { ISession } from '../src/client/contract/session.ts'
 import type { ProjectionsBaseline } from '../src/client/sessions/projection-store.ts'
 import { ProjectionValueStore } from '../src/client/sessions/projection-store.ts'
@@ -36,7 +35,7 @@ function transient(attemptId: string, seq = 1.5): SessionTransientEventEntry {
       seq,
       time: 1,
       data: {
-        attemptId: brandString<LlmAttemptId>(attemptId),
+        attemptId: LlmAttemptId(attemptId),
         turn: 1,
         step: 1,
         chunk: { type: 'text-delta', index: 0, text: 'live' },
@@ -161,7 +160,7 @@ describe('Client Session contracts', () => {
     const later = entry(SessionSeq(3))
     feed.replace([opening, live, later], false)
 
-    feed.settleAssistant(brandString<LlmAttemptId>('attempt-one'), settlement)
+    feed.settleAssistant(LlmAttemptId('attempt-one'), settlement)
 
     expect(feed.getSnapshot()).toEqual({
       entries: [opening, settlement, later],
@@ -175,7 +174,7 @@ describe('Client Session contracts', () => {
     })
 
     feed.append(transient('attempt-two', 3.5))
-    feed.settleAssistant(brandString<LlmAttemptId>('attempt-two'))
+    feed.settleAssistant(LlmAttemptId('attempt-two'))
     expect(feed.getSnapshot().entries).toEqual([opening, settlement, later])
     expect(feed.getSnapshot().change).toEqual({
       kind: 'settle-assistant',

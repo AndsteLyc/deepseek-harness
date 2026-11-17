@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PROTOCOL_VERSION } from '@agentclientprotocol/sdk'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import { createUserMessage, type ToolCallId, type StreamChunk  } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId, type StreamChunk  } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { defineContentToolFixture } from '@deepseek-ai/dsh-tool-testkit'
 import { makeBridgeHarness, textResponse, type BridgeHarness } from './harness.ts'
 
@@ -19,8 +18,8 @@ function toolCallResponse(): StreamChunk[] {
     { type: 'reasoning-delta', index: 0, text: 'inspect first' },
     { type: 'block-end', index: 0, block: { type: 'reasoning', text: 'inspect first' } },
     { type: 'block-start', index: 1, blockType: 'tool-call' },
-    { type: 'tool-call-delta', index: 1, id: brandString<ToolCallId>('call-1'), name: 'echo', argumentsDelta: '{}' },
-    { type: 'block-end', index: 1, block: { type: 'tool-call', id: brandString<ToolCallId>('call-1'), name: 'echo', arguments: '{}' } },
+    { type: 'tool-call-delta', index: 1, id: ToolCallId('call-1'), name: 'echo', argumentsDelta: '{}' },
+    { type: 'block-end', index: 1, block: { type: 'tool-call', id: ToolCallId('call-1'), name: 'echo', arguments: '{}' } },
     { type: 'usage', usage: { inputTokens: 8, outputTokens: 2, reasoningTokens: 1 } },
     { type: 'finish', reason: { kind: 'tool-calls' } },
   ]
@@ -92,7 +91,7 @@ describe('ACP automation output boundary', () => {
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
     const { agent } = await harness.ctx.agents.create({
-      sessionId: brandString<SessionId>('foreign'),
+      sessionId: SessionId('foreign'),
       agentOptions: { provider: 'mock', model: 'mock' },
     })
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
@@ -104,7 +103,7 @@ describe('ACP automation output boundary', () => {
     harness = await makeBridgeHarness({ script: [textResponse('external')] })
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const { sessionId } = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
-    const agent = harness.ctx.agents.get(brandString<SessionId>(sessionId))!
+    const agent = harness.ctx.agents.get(SessionId(sessionId))!
 
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'test' } }))
     await agent.whenIdle()
@@ -139,7 +138,7 @@ describe('ACP automation output boundary', () => {
     const warn = vi.spyOn(harness.ctx.logger, 'warn')
     await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })
     const { sessionId } = await harness.client.newSession({ cwd: process.cwd(), mcpServers: [] })
-    const agent = harness.ctx.agents.get(brandString<SessionId>(sessionId))!
+    const agent = harness.ctx.agents.get(SessionId(sessionId))!
 
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'test' } }))
     await agent.whenIdle()

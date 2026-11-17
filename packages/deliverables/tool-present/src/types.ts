@@ -1,5 +1,5 @@
 /** Durable file deliveries produced by the present tool. */
-import type { ToolCallId } from '@deepseek-ai/dsh-llm/types'
+import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
 
 /** A declared filesystem file whose current contents remain at its source path. */
 export interface PresentedFile {

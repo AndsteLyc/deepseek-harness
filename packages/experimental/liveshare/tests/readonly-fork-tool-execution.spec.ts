@@ -25,10 +25,9 @@ import { provideWorkingDirectoryFixture } from '@deepseek-ai/dsh-agent-loop-test
 import { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createScope, type Scope } from '@deepseek-ai/dsh-scope'
-import { SESSION_FORMAT_VERSION, Session, type SessionId } from '@deepseek-ai/dsh-session'
+import { SESSION_FORMAT_VERSION, Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { FsTarget } from '@deepseek-ai/dsh-fs'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool, type ParameterSchemaSpec } from '@deepseek-ai/dsh-tools'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
@@ -112,7 +111,7 @@ function call(name: string, args: unknown) {
   calls += 1
   return executeOneTool(ctx, {
     signal: testToolSignal,
-    callId: brandString<ToolCallId>(`call-${String(calls)}`),
+    callId: ToolCallId(`call-${String(calls)}`),
     name,
     arguments: args,
     agent: child,
@@ -143,7 +142,7 @@ beforeEach(async () => {
   await ctx.plugin(LocalFileSystem, { cwd: root })
   await ctx.plugin(ToolFs)
 
-  const key: Omit<ChildAgent, 'ctx'> = standInAgent(brandString<SessionId>(childSessionId), root)
+  const key: Omit<ChildAgent, 'ctx'> = standInAgent(SessionId(childSessionId), root)
   let minted: Scope | undefined
   await ctx.plugin(Object.assign(
     (inner: Context) => { minted = createScope(inner, key) },
@@ -456,7 +455,7 @@ describe('fork child tool execution', () => {
   it('sandboxes a viewer-started turn while its layer is mounted', async () => {
     // A shared Session: a viewer-started turn reads only inside the granted workspace and can use nothing
     // this host did not install. Removing the layer is what restores the Session's own tools.
-    const key = standInAgent(brandString<SessionId>('session-shared-live'), root)
+    const key = standInAgent(SessionId('session-shared-live'), root)
     let sharedScope!: Scope
     await ctx.plugin(Object.assign(
       (inner: Context) => { sharedScope = createScope(inner, key) },
@@ -523,7 +522,7 @@ describe('fork child tool execution', () => {
     expect(access.readConfined).toBe(true)
     const run = (name: string, args: unknown) => executeOneTool(ctx, {
       signal: testToolSignal,
-      callId: brandString<ToolCallId>(`shared-${name}`),
+      callId: ToolCallId(`shared-${name}`),
       name,
       arguments: args,
       agent: shared,
@@ -585,7 +584,7 @@ describe('fork child tool execution', () => {
   it('leaves an owner-started turn on the deployment’s own tools', async () => {
     // The layer belongs to the Session, but the share bounds only the turns a viewer starts: the owner
     // keeps the deployment's shell and its unbounded filesystem tools while every share is active.
-    const key = standInAgent(brandString<SessionId>('session-owner-turn'), root)
+    const key = standInAgent(SessionId('session-owner-turn'), root)
     let sharedScope!: Scope
     await ctx.plugin(Object.assign(
       (inner: Context) => { sharedScope = createScope(inner, key) },
@@ -621,7 +620,7 @@ describe('fork child tool execution', () => {
     let calls = 0
     const run = (name: string, args: unknown) => executeOneTool(ctx, {
       signal: testToolSignal,
-      callId: brandString<ToolCallId>(`owner-${String(++calls)}`),
+      callId: ToolCallId(`owner-${String(++calls)}`),
       name,
       arguments: args,
       agent: shared,
@@ -665,7 +664,7 @@ describe('fork child tool execution', () => {
   })
 
   it('refuses write and edit on a view-tier shared Session', async () => {
-    const key = standInAgent(brandString<SessionId>('session-view-live'), root)
+    const key = standInAgent(SessionId('session-view-live'), root)
     let viewScope!: Scope
     await ctx.plugin(Object.assign(
       (inner: Context) => { viewScope = createScope(inner, key) },
@@ -686,7 +685,7 @@ describe('fork child tool execution', () => {
     expect(access).toMatchObject({ readConfined: true, writeConfined: false })
     const run = (name: string, args: unknown) => executeOneTool(ctx, {
       signal: testToolSignal,
-      callId: brandString<ToolCallId>(`view-${name}`),
+      callId: ToolCallId(`view-${name}`),
       name,
       arguments: args,
       agent: view,
@@ -729,7 +728,7 @@ describe('fork child tool execution', () => {
       childScope: writer,
       grantedRoot: granted,
       cwd: root,
-      resolvePolicy: () => ({ mode: 'workspace-write', workspaceRoot: root, sessionId: brandString<SessionId>(writer.id) }),
+      resolvePolicy: () => ({ mode: 'workspace-write', workspaceRoot: root, sessionId: SessionId(writer.id) }),
       fs: ctx.fs,
       tools: ctx.tools,
       forks,
@@ -739,7 +738,7 @@ describe('fork child tool execution', () => {
     expect(dispose).toBeDefined()
     const call = (name: string, args: unknown) => executeOneTool(ctx, {
       signal: testToolSignal,
-      callId: brandString<ToolCallId>(`write-${name}`),
+      callId: ToolCallId(`write-${name}`),
       name,
       arguments: args,
       agent: writer as never,
@@ -778,7 +777,7 @@ describe('fork child tool execution', () => {
       childScope: writer,
       grantedRoot: granted,
       cwd: root,
-      resolvePolicy: () => ({ mode: 'workspace-write', workspaceRoot: root, sessionId: brandString<SessionId>('child-editor') }),
+      resolvePolicy: () => ({ mode: 'workspace-write', workspaceRoot: root, sessionId: SessionId('child-editor') }),
       fs: ctx.fs,
       tools: ctx.tools,
       forks,
@@ -789,7 +788,7 @@ describe('fork child tool execution', () => {
     const path = join(root, 'inside.ts')
     const run = (name: string, args: unknown) => executeOneTool(ctx, {
       signal: testToolSignal,
-      callId: brandString<ToolCallId>(`edit-${name}`),
+      callId: ToolCallId(`edit-${name}`),
       name,
       arguments: args,
       agent: writer as never,
@@ -849,7 +848,7 @@ describe('fork child tool execution', () => {
       childScope: layeredChild,
       grantedRoot: granted,
       cwd: root,
-      resolvePolicy: () => ({ mode: 'workspace-write', workspaceRoot: root, sessionId: brandString<SessionId>(layeredChild.id) }),
+      resolvePolicy: () => ({ mode: 'workspace-write', workspaceRoot: root, sessionId: SessionId(layeredChild.id) }),
       fs: ctx.fs,
       tools: ctx.tools,
       forks,
@@ -859,7 +858,7 @@ describe('fork child tool execution', () => {
     expect(dispose).toBeDefined()
     const layered = await executeOneTool(ctx, {
       signal: testToolSignal,
-      callId: brandString<ToolCallId>('call-layered'),
+      callId: ToolCallId('call-layered'),
       name: 'read',
       arguments: { file_path: join(root, 'inside.ts') },
       agent: layeredChild as never,

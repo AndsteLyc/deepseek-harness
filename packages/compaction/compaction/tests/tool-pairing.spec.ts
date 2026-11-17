@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createUserMessage, type ToolCallId , createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, ToolCallId , createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { CompactionId } from '@deepseek-ai/dsh-compaction/types'
-import { compactCheckpointSource, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@deepseek-ai/dsh-compaction'
-import { Session, type SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import { CompactionId, compactCheckpointSource, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@deepseek-ai/dsh-compaction'
+import { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionSeq as SessionSeqType } from '@deepseek-ai/dsh-session'
 
 declare module '@deepseek-ai/dsh-llm' {
@@ -34,7 +32,7 @@ function after(session: Session, type: SessionEvent['type'], nth = 0): boolean {
 }
 
 function closedToolStep(): Session {
-  const session = Session.create(brandString<SessionId>('closed-tool-step'))
+  const session = Session.create(SessionId('closed-tool-step'))
   session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'go' }],
     source: { kind: 'user' },
@@ -45,7 +43,7 @@ function closedToolStep(): Session {
     step: 1,
     message: createMessage({
       role: 'assistant',
-      content: [{ type: 'tool-call', id: brandString<ToolCallId>('c1'), name: 'bash', arguments: '{}' }],
+      content: [{ type: 'tool-call', id: ToolCallId('c1'), name: 'bash', arguments: '{}' }],
       source: {
         kind: 'model',
         ...{ provider: 'mock', model: 'mock' },
@@ -56,7 +54,7 @@ function closedToolStep(): Session {
     turn: 1,
     step: 1,
     message: createToolResultMessage({
-      callId: brandString<ToolCallId>('c1'),
+      callId: ToolCallId('c1'),
       content: [{ type: 'text', text: 'done' }],
       isError: false,
     }),
@@ -74,14 +72,14 @@ describe('tool-pairing boundaries', () => {
     expect(before(closed, 'tool/result')).toBe(false)
     expect(after(closed, 'tool/result')).toBe(true)
 
-    const open = Session.create(brandString<SessionId>('open-tool-step'))
+    const open = Session.create(SessionId('open-tool-step'))
     open.append('assistant/message', {
       stream: [],
       turn: 1,
       step: 1,
       message: createMessage({
         role: 'assistant',
-        content: [{ type: 'tool-call', id: brandString<ToolCallId>('open'), name: 'bash', arguments: '{}' }],
+        content: [{ type: 'tool-call', id: ToolCallId('open'), name: 'bash', arguments: '{}' }],
         source: {
           kind: 'model',
           ...{ provider: 'mock', model: 'mock' },
@@ -92,7 +90,7 @@ describe('tool-pairing boundaries', () => {
   })
 
   it('requires every result from a multiple-call assistant message', () => {
-    const session = Session.create(brandString<SessionId>('multiple-calls'))
+    const session = Session.create(SessionId('multiple-calls'))
     session.append('assistant/message', {
       stream: [],
       turn: 1,
@@ -100,8 +98,8 @@ describe('tool-pairing boundaries', () => {
       message: createMessage({
         role: 'assistant',
         content: [
-          { type: 'tool-call', id: brandString<ToolCallId>('c1'), name: 'one', arguments: '{}' },
-          { type: 'tool-call', id: brandString<ToolCallId>('c2'), name: 'two', arguments: '{}' },
+          { type: 'tool-call', id: ToolCallId('c1'), name: 'one', arguments: '{}' },
+          { type: 'tool-call', id: ToolCallId('c2'), name: 'two', arguments: '{}' },
         ],
         source: {
           kind: 'model',
@@ -112,7 +110,7 @@ describe('tool-pairing boundaries', () => {
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: brandString<ToolCallId>('c1'),
+        callId: ToolCallId('c1'),
         content: [],
         isError: false,
       }),
@@ -120,7 +118,7 @@ describe('tool-pairing boundaries', () => {
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: brandString<ToolCallId>('c2'),
+        callId: ToolCallId('c2'),
         content: [],
         isError: false,
       }),
@@ -131,14 +129,14 @@ describe('tool-pairing boundaries', () => {
   })
 
   it('keeps neutral nodes inside an open pair unbalanced and free nodes balanced', () => {
-    const midStep = Session.create(brandString<SessionId>('neutral-mid-step'))
+    const midStep = Session.create(SessionId('neutral-mid-step'))
     midStep.append('assistant/message', {
       stream: [],
       turn: 1,
       step: 1,
       message: createMessage({
         role: 'assistant',
-        content: [{ type: 'tool-call', id: brandString<ToolCallId>('c1'), name: 'bash', arguments: '{}' }],
+        content: [{ type: 'tool-call', id: ToolCallId('c1'), name: 'bash', arguments: '{}' }],
         source: {
           kind: 'model',
           ...{ provider: 'mock', model: 'mock' },
@@ -152,7 +150,7 @@ describe('tool-pairing boundaries', () => {
     midStep.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: brandString<ToolCallId>('c1'),
+        callId: ToolCallId('c1'),
         content: [],
         isError: false,
       }),
@@ -160,7 +158,7 @@ describe('tool-pairing boundaries', () => {
     expect(before(midStep, 'user/message')).toBe(false)
     expect(after(midStep, 'user/message')).toBe(false)
 
-    const free = Session.create(brandString<SessionId>('neutral-free'))
+    const free = Session.create(SessionId('neutral-free'))
     free.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'idle injection' }],
       source: { kind: 'user' },
@@ -179,7 +177,7 @@ describe('tool-pairing surface identity', () => {
     const nodes = session.surface.nodes
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'checkpoint' }],
-      source: compactCheckpointSource(brandString<CompactionId>('tool-pairing-compaction')),
+      source: compactCheckpointSource(CompactionId('tool-pairing-compaction')),
     }), {
       surfaceOp: { op: 'replace', startSeq: nodes[0]!, endSeq: nodes.at(-1)! },
       sourceEventSeqs: [...nodes],
@@ -200,7 +198,7 @@ describe('tool-pairing surface identity', () => {
   })
 
   it('rejects missing seqs before and after, including an empty surface', () => {
-    const session = Session.create(brandString<SessionId>('missing-membership'))
+    const session = Session.create(SessionId('missing-membership'))
     const missing = SessionSeq(999)
     expect(() => toolPairingBalancedBefore(session, missing)).toThrow(/surface seq 999 not found/)
     expect(() => toolPairingBalancedAfter(session, missing)).toThrow(/surface seq 999 not found/)
@@ -231,7 +229,7 @@ describe('tool-pairing cache refresh', () => {
           step: 1,
           message: createMessage({
             role: 'assistant',
-            content: [{ type: 'tool-call', id: brandString<ToolCallId>('c1'), name: 'one', arguments: '{}' }],
+            content: [{ type: 'tool-call', id: ToolCallId('c1'), name: 'one', arguments: '{}' }],
             source: {
               kind: 'model',
               ...{ provider: 'mock', model: 'mock' },
@@ -245,7 +243,7 @@ describe('tool-pairing cache refresh', () => {
         data: {
           turn: 1, step: 1,
           message: createToolResultMessage({
-            callId: brandString<ToolCallId>('c1'),
+            callId: ToolCallId('c1'),
             content: [],
             isError: false,
           }),
@@ -301,7 +299,7 @@ describe('tool-pairing cache refresh', () => {
           step: 1,
           message: createMessage({
             role: 'assistant',
-            content: [{ type: 'tool-call', id: brandString<ToolCallId>('c2'), name: 'two', arguments: '{}' }],
+            content: [{ type: 'tool-call', id: ToolCallId('c2'), name: 'two', arguments: '{}' }],
             source: {
               kind: 'model',
               ...{ provider: 'mock', model: 'mock' },
@@ -315,7 +313,7 @@ describe('tool-pairing cache refresh', () => {
         data: {
           turn: 2, step: 1,
           message: createToolResultMessage({
-            callId: brandString<ToolCallId>('c2'),
+            callId: ToolCallId('c2'),
             content: [],
             isError: false,
           }),
@@ -368,11 +366,11 @@ describe('tool-pairing cache refresh', () => {
 
 describe('tool-pairing corrupt surfaces', () => {
   it('throws for an orphan result during a rebuild', () => {
-    const session = Session.create(brandString<SessionId>('orphan-rebuild'))
+    const session = Session.create(SessionId('orphan-rebuild'))
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: brandString<ToolCallId>('orphan'),
+        callId: ToolCallId('orphan'),
         content: [],
         isError: false,
       }),
@@ -381,7 +379,7 @@ describe('tool-pairing corrupt surfaces', () => {
   })
 
   it('retries an orphan result in an appended tail without committing partial cache state', () => {
-    const session = Session.create(brandString<SessionId>('orphan-tail'))
+    const session = Session.create(SessionId('orphan-tail'))
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'safe head' }], source: { kind: 'user' },
     }), SURFACE)
@@ -389,7 +387,7 @@ describe('tool-pairing corrupt surfaces', () => {
     session.append('tool/result', {
       turn: 1, step: 1,
       message: createToolResultMessage({
-        callId: brandString<ToolCallId>('orphan'),
+        callId: ToolCallId('orphan'),
         content: [],
         isError: false,
       }),

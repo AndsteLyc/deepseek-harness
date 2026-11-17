@@ -7,13 +7,12 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import * as JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import LocalFileReference from '@deepseek-ai/dsh-file-reference-local'
 import Selection from '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
@@ -82,7 +81,7 @@ describe('serial creation listener integrations', () => {
     await ctx.plugin(LocalFileReference)
     try {
       await expect(ctx.agents.create({
-        sessionId: brandString<SessionId>('review-file-reference'),
+        sessionId: SessionId('review-file-reference'),
         setup(agentCtx) {
           agentCtx.systemPrompt.section({ name: 'context:file-reference', order: 0, text: 'occupied' })
         },
@@ -100,7 +99,7 @@ describe('serial creation listener integrations', () => {
     await ctx.plugin(Selection, { enabled: true, allowedModels: [] })
     try {
       await expect(ctx.agents.create({
-        sessionId: brandString<SessionId>('review-tool'),
+        sessionId: SessionId('review-tool'),
       })).rejects.toThrow('subagent model selection requires at least one allowed model')
       expect(ctx.agents.list()).toEqual([])
       expect(ctx.sessions.list()).toEqual([])
@@ -113,7 +112,7 @@ describe('serial creation listener integrations', () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-serial-due-'))
     roots.push(root)
     const ctx = await core(root)
-    const sessionId = brandString<SessionId>('review-due-work')
+    const sessionId = SessionId('review-due-work')
     const plugin = 'review-due-reminder'
     const available = Promise.withResolvers<Agent>()
     // The resolver returns the Agent while its serial publication listeners are blocked.

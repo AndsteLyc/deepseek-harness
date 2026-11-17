@@ -14,18 +14,16 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { defineTool, ToolArgsError, ToolContextUnavailableError } from '@deepseek-ai/dsh-tools'
+import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolCallView, ToolResultView } from '@deepseek-ai/dsh-tools'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { JobId, JobOutcome, JobToolCall } from '@deepseek-ai/dsh-jobs'
 import type { Session, SessionEventMap } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
-import { WorkflowError } from '@deepseek-ai/dsh-workflow'
 import type {
-  WorkflowResult, WorkflowRun, WorkflowStopReason,
+  WorkflowResult, WorkflowRun, WorkflowRunId, WorkflowStopReason,
 } from '@deepseek-ai/dsh-workflow'
-import type { WorkflowRunId } from '@deepseek-ai/dsh-workflow/types'
 import { createWorkflowRecordMirror } from './record.ts'
 import type { WorkflowRecordMirror } from './record.ts'
 import type {
@@ -196,17 +194,17 @@ function presentWorkflowResult(args: WorkflowCallArgs, result: { content: Conten
 }
 
 /** A non-`completed` stop reason means the script did not finish cleanly. */
-function stopReasonError(result: WorkflowResult): WorkflowError | undefined {
+function stopReasonError(result: WorkflowResult): string | undefined {
   switch (result.stopReason) {
     case 'completed':
       return undefined
     case 'cancelled':
-      return new WorkflowError(`workflow run was cancelled${result.error !== undefined ? ` (${result.error})` : ''}`, 'CANCELLED')
+      return `workflow run was cancelled${result.error !== undefined ? ` (${result.error})` : ''}`
     case 'error':
-      return new WorkflowError(`workflow run failed: ${result.error ?? 'unknown error'}`, result.errorCode ?? 'RUN_FAILED')
+      return `workflow run failed: ${result.error ?? 'unknown error'}`
     /* v8 ignore start -- defensive: WorkflowStopReason is a closed union, exhaustive by construction; a future variant fails here loudly */
     default:
-      return new WorkflowError(`workflow run ended abnormally (${String(result.stopReason satisfies never)})`, 'RUN_FAILED')
+      return `workflow run ended abnormally (${String(result.stopReason satisfies never)})`
     /* v8 ignore stop */
   }
 }
@@ -272,7 +270,7 @@ function startBackgroundRun(
 ): { kind: 'background'; jobId: JobId; runId: WorkflowRunId } {
   const jobs = ctx.get('jobs')
   if (jobs === undefined) {
-    throw new ToolContextUnavailableError('background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs')
+    throw new Error('background jobs unavailable: load @deepseek-ai/dsh-jobs and @deepseek-ai/dsh-tool-jobs')
   }
   let run!: WorkflowRun
   const jobId = jobs.start({
@@ -414,12 +412,11 @@ export function apply(ctx: Context, config: Config): void {
         // The loop sets `exec.agent` for every model-driven call; its absence
         // means a non-agent caller invoked the tool directly, which has no
         // parent to attribute the children to. Fail loud rather than guess.
-        throw new ToolContextUnavailableError('workflow tool requires a calling agent (exec.agent was undefined)')
+        throw new Error('workflow tool requires a calling agent (exec.agent was undefined)')
       }
       if (args.run_in_background === true) {
         if (!enableRunInBackground) {
-          // The schema omits the field when disabled, so the model corrects by omitting it.
-          throw new ToolArgsError(['run_in_background is disabled for this tool'])
+          throw new Error('run_in_background is disabled for this tool')
         }
         // No pre-abort check here, unlike bash/pwsh: ToolRuntime re-reads the
         // caller signal right before execute(), and this branch reaches
@@ -458,11 +455,9 @@ export function apply(ctx: Context, config: Config): void {
         result = await run.result
         const error = stopReasonError(result)
         if (error !== undefined) {
-          // Caller cancellation keeps the registry's AbortError identity; any
-          // other non-clean finish becomes a coded isError result. Report the
-          // reason, not partial output.
-          exec.signal.throwIfAborted()
-          throw error
+          // Map a non-clean finish to an isError result (the registry turns a
+          // throw into an isError). Report the reason, not partial output.
+          throw new Error(error)
         }
         return {
           kind: 'foreground' as const,
@@ -478,7 +473,7 @@ export function apply(ctx: Context, config: Config): void {
           await run.dispose()
           if (recordsRun) {
             /* v8 ignore next -- WorkflowRun.result never rejects by contract, so result is assigned before finally. */
-            if (result === undefined) throw new WorkflowError('workflow run settled without a result', 'RUN_FAILED')
+            if (result === undefined) throw new Error('workflow run settled without a result')
             recorder.finish(run.id, result.stopReason)
           }
         } finally {

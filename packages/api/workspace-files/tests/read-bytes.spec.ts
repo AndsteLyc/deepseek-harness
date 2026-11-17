@@ -2,8 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { FsVersion } from '@deepseek-ai/dsh-fs'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { FsVersion } from '@deepseek-ai/dsh-fs'
 import { failureOf, openWorkspace, signal, type Harness } from './harness.ts'
 
 let harness: Harness
@@ -54,7 +53,7 @@ describe('workspaceFiles.readBytes — the window', () => {
 
   it('infers eof from a short window when the backend reports no size', async () => {
     await writeFile(join(workspace, 'ramp.bin'), RAMP)
-    vi.spyOn(harness.ctx.fs, 'stat').mockResolvedValue({ version: brandString<FsVersion>('v-sizeless'), type: 'file' })
+    vi.spyOn(harness.ctx.fs, 'stat').mockResolvedValue({ version: FsVersion('v-sizeless'), type: 'file' })
     const full = await endpoint().readBytes(harness.scope, 'ramp.bin', { range: { offset: 0, length: 256 } }, signal())
     expect(full.eof).toBe(false)
     const short = await endpoint().readBytes(harness.scope, 'ramp.bin', { range: { offset: 250, length: 10 } }, signal())

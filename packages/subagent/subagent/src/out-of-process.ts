@@ -13,7 +13,6 @@
 import { accessSync, constants, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import { SubagentError } from './error.ts'
 import type { SubagentCapabilities, SubagentResult, SubagentRun, SubagentStopReason } from './types.ts'
 
 /** Maximum UTF-8 size of {@link SubagentResult.diagnostic}. */
@@ -101,14 +100,13 @@ function isEnterableDirectory(path: string): boolean {
  * @param label - which source supplied the value, for the diagnostic.
  * @param cwd - the candidate working directory.
  * @returns `cwd`, validated.
- * @throws {SubagentError} `INVALID_CWD` when `cwd` is relative or not an enterable directory.
  */
 export function assertUsableCwd(prefix: string, label: string, cwd: string): string {
   if (!isAbsolute(cwd)) {
-    throw new SubagentError(`${prefix}: ${label} must be an absolute path: ${cwd}`, 'INVALID_CWD')
+    throw new Error(`${prefix}: ${label} must be an absolute path: ${cwd}`)
   }
   if (!isEnterableDirectory(cwd)) {
-    throw new SubagentError(`${prefix}: ${label} is not an accessible directory: ${cwd}`, 'INVALID_CWD')
+    throw new Error(`${prefix}: ${label} is not an accessible directory: ${cwd}`)
   }
   return cwd
 }

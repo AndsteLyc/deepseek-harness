@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import fc from 'fast-check'
 import {
+  ScheduleId,
   createEveryScheduleRecord,
   resolveEveryOccurrence,
 } from '../src/domain.ts'
-import type { ScheduleId } from '../src/types.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 const BASE = Date.parse('2000-01-01T00:00:00.000Z')
 
@@ -17,7 +16,7 @@ describe('fixed-rate recurrence properties', () => {
       fc.nat({ max: 86_399_999 }),
       (everySeconds, skipped, rawOffset) => {
         const record = createEveryScheduleRecord(
-          brandString<ScheduleId>('schedule-property'),
+          ScheduleId('schedule-property'),
           'property reminder',
           everySeconds,
           BASE,

@@ -59,12 +59,9 @@ try {
 
 ### Running agent turns with DeepSeekHarness
 
-The following example imports `brandString` at runtime. Declare `@deepseek-ai/dsh-brand` as a direct dependency of your application rather than relying on the SDK's transitive dependencies; tests alone can use a development dependency.
-
 ```ts
 import { DeepSeekHarness } from '@deepseek-ai/dsh-sdk-client'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm/types'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 
 await using harness = new DeepSeekHarness({
   profile: 'sdk',
@@ -72,7 +69,7 @@ await using harness = new DeepSeekHarness({
   patches: ['./automation.cordis.yml'],
   provider: 'deepseek-official',
   model: 'deepseek-v4-flash',
-  reasoningEffort: brandString<ReasoningEffortId>('max'),
+  reasoningEffort: ReasoningEffortId('max'),
   maxTokens: 49_152,
 })
 const result = await harness.run('say hi')

@@ -12,7 +12,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { parseEntryYaml } from '@deepseek-ai/cordis-plugin-include'
+import * as yaml from 'js-yaml'
+import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import { loadOverlayPatches, renderConfigDump } from '../src/index.ts'
 
 const NAME = 'dsh-test-bin'
@@ -72,7 +73,7 @@ describe('renderConfigDump', () => {
     ], () => {})
     // Comments do not break loadability: the dump parses as one document
     // equal to what boot() would mount.
-    const parsed = parseEntryYaml(dump) as {
+    const parsed = yaml.load(dump, { schema: entryListSchema }) as {
       id: string
       config?: Record<string, unknown>
     }[]
@@ -139,7 +140,7 @@ describe('renderConfigDump', () => {
       { label: 'b.yml', patches: [{ id: 'child', config: { v: 2 } }] },
     ], line => void warnings.push(line))
     expect(warnings).toEqual([`${NAME}: [b.yml] patch: entry "child" not found`])
-    const parsed = parseEntryYaml(dump) as {
+    const parsed = yaml.load(dump, { schema: entryListSchema }) as {
       config?: { config?: { v?: number } }[]
     }[]
     expect(parsed[0]?.config?.[0]?.config?.v).toBe(1)
@@ -168,7 +169,7 @@ describe('renderConfigDump', () => {
       line => void warnings.push(line),
     )
     expect(warnings).toEqual([`${NAME}: [overlay.yml] patch: entry "only-on-another-surface" not found`])
-    const parsed = parseEntryYaml(dump) as { config?: { value?: string } }[]
+    const parsed = yaml.load(dump, { schema: entryListSchema }) as { config?: { value?: string } }[]
     expect(parsed[0]?.config?.value).toBe('patched')
   })
 

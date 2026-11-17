@@ -17,7 +17,7 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { agentPresetProjectionDefinition } from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SESSION_FORMAT_VERSION, type SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent, SessionHeader, UserMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
@@ -33,7 +33,6 @@ import {
   mountAgentLoopTestHarness,
 } from '@deepseek-ai/dsh-agent-loop-testkit'
 import { createSessionTestRemote, testSessionPersistence, type TestSessionRemote } from './test-remote.ts'
-import { brandString } from '@deepseek-ai/dsh-brand'
 
 const ownedContexts = new Set<Context>()
 afterEach(async () => {
@@ -137,7 +136,7 @@ async function harness(withRegistry: boolean): Promise<{
   await mountAgentLoopTestDependencies(ctx)
   const loop = await mountAgentLoopTestHarness(ctx)
   const agent = await loop.create(
-    brandString<SessionId>(`session-projections-${String(nextHarnessSession++)}`),
+    SessionId(`session-projections-${String(nextHarnessSession++)}`),
     {},
     { cwd: '/workspace' },
   )
@@ -166,11 +165,11 @@ describe('session.history projections block', () => {
     await ctx.plugin(SessionStore)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(AgentRegistry)
-    const parent = ctx.sessions.create(brandString<SessionId>('wire-seed-parent'), { meta: { cwd: '/workspace' } })
+    const parent = ctx.sessions.create(SessionId('wire-seed-parent'), { meta: { cwd: '/workspace' } })
     parent.append('turn/start', { turn: 1 })
     parent.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     const inheritedEventCount = parent.seq
-    const child = ctx.sessions.create(brandString<SessionId>('wire-seed-child'), {
+    const child = ctx.sessions.create(SessionId('wire-seed-child'), {
       seed: parent.snapshotEvents(),
       inheritedEventCount,
       meta: {
@@ -239,7 +238,7 @@ describe('session.history projections block', () => {
     ownedContexts.add(ctx)
     await mountAgentLoopTestDependencies(ctx)
     await mountAgentLoopTestHarness(ctx)
-    const coldId = brandString<SessionId>('cold-persisted-queue')
+    const coldId = SessionId('cold-persisted-queue')
     const meta: SessionHeader = { version: SESSION_FORMAT_VERSION, id: coldId, createdAt: 1, cwd: '/tmp', isSeeded: false }
     const message = createUserMessage({
       content: [{ type: 'text', text: 'survive process restart' }],
@@ -496,7 +495,7 @@ describe('session.list projections column', () => {
 
   it('lists the latest preset selected by a blank Session instead of its creation preset', async () => {
     const { ctx } = await harness(true)
-    const session = ctx.sessions.create(brandString<SessionId>('preset-list'), {
+    const session = ctx.sessions.create(SessionId('preset-list'), {
       meta: { cwd: '/workspace', agentPreset: 'standard' },
     })
     await ctx.sessionProjections.register(agentPresetProjectionDefinition)
@@ -547,7 +546,7 @@ describe('session.list projections column', () => {
 
   it('serves the summary projection hints from the cache with zero log loads', async () => {
     const { ctx } = await harness(true)
-    const coldId = brandString<SessionId>('session-cold-listing')
+    const coldId = SessionId('session-cold-listing')
     const load = () => { throw new Error('list must not load event logs') }
     ctx.provide('sessionPersistence', testSessionPersistence(ctx, {
       list: async () => [{ version: SESSION_FORMAT_VERSION, id: coldId, createdAt: 5, isSeeded: false, cwd: '/tmp' }],
@@ -603,7 +602,7 @@ describe('session.list projections column', () => {
       const gateway = await remote(ctx)
       await new Promise(resolve => setTimeout(resolve, 0))
 
-      const id = brandString<SessionId>('session-cold-host-state')
+      const id = SessionId('session-cold-host-state')
       const secret = 'private prompt text from the cache'
       let session: Session | undefined
       const owner = await ctx.plugin(Object.assign((sessionCtx: Context) => {
@@ -643,7 +642,7 @@ describe('session.list projections column', () => {
 
   it('lists a forked Session\'s cached title after a Host restart without opening its body', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-api-projcache-'))
-    const id = brandString<SessionId>('session-cold-fork')
+    const id = SessionId('session-cold-fork')
     /** One Host process over `root`: storage stack, registry with the title unit, and the cache. */
     const boot = async (): Promise<Context> => {
       const ctx = new Context()
@@ -669,7 +668,7 @@ describe('session.list projections column', () => {
       await new Promise(resolve => setTimeout(resolve, 0))
       let child: Session | undefined
       const owner = await first.plugin(Object.assign((sessionCtx: Context) => {
-        const parent = sessionCtx.sessions.create(brandString<SessionId>('session-cold-fork-parent'), {
+        const parent = sessionCtx.sessions.create(SessionId('session-cold-fork-parent'), {
           meta: { createdAt: 5, cwd: '/workspace' },
         })
         parent.append('turn/start', { turn: 1 })
@@ -726,7 +725,7 @@ describe('session.list projections column', () => {
 
   it('cold rows without a cache plugin (or without a stored row) just lack the column', async () => {
     const { ctx } = await harness(true)
-    const coldId = brandString<SessionId>('session-cold-uncached')
+    const coldId = SessionId('session-cold-uncached')
     ctx.provide('sessionPersistence', testSessionPersistence(ctx, {
       list: async () => [{ version: SESSION_FORMAT_VERSION, id: coldId, createdAt: 5, isSeeded: false, cwd: '/tmp' }],
     }) as never)

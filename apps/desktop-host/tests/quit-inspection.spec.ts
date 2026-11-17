@@ -1,8 +1,7 @@
 import { Context } from '@deepseek-ai/cordis'
-import { type JobId, JobRegistry } from '@deepseek-ai/dsh-jobs'
-import { brandString } from '@deepseek-ai/dsh-brand'
+import { JobId, JobRegistry } from '@deepseek-ai/dsh-jobs'
 import type { JobStatus, JobView } from '@deepseek-ai/dsh-jobs'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionActivity } from '@deepseek-ai/dsh-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { installDesktopQuitInspection } from '../src/quit-inspection.ts'
@@ -22,7 +21,7 @@ class RosterOnlyJobRegistry extends JobRegistry {
   start(): never { throw new Error('unsupported') }
   list(caller?: SessionId): JobView[] {
     return (jobs.get(caller) ?? []).map((status, index) => ({
-      id: brandString<JobId>(`bash-${index + 1}`),
+      id: JobId(`bash-${index + 1}`),
       kind: 'bash',
       label: 'sleep 60',
       ...caller === undefined ? {} : { owner: caller },
@@ -41,7 +40,7 @@ class RosterOnlyJobRegistry extends JobRegistry {
 }
 
 function agent(id: string, status: 'idle' | 'running' = 'idle'): AgentState {
-  return { id: brandString<SessionId>(id), status, inbox: { nextTurn: [], nextStep: [] } }
+  return { id: SessionId(id), status, inbox: { nextTurn: [], nextStep: [] } }
 }
 
 beforeEach(() => {
@@ -61,7 +60,7 @@ afterEach(async () => { await ctx.fiber.dispose() })
 describe('Desktop Host quit inspection', () => {
   it('reports neither active nor scheduled work for idle loaded sessions', async () => {
     agents.push(agent('quiet'))
-    activity.set(brandString<SessionId>('quiet'), [{ kind: 'turn' }])
+    activity.set(SessionId('quiet'), [{ kind: 'turn' }])
     expect(await inspect()).toEqual({ activeTasks: false, scheduledTasks: false })
   })
 
@@ -78,14 +77,14 @@ describe('Desktop Host quit inspection', () => {
     const asked: SessionId[] = []
     ctx.on('workspace/session-activity', async ({ sessionId }, next) => { asked.push(sessionId); return next() })
     agents.push(agent('first'), agent('second'), agent('third'))
-    activity.set(brandString<SessionId>('second'), [{ kind: 'schedule', items: [{ id: 'reminder-1', label: 'stand-up' }] }])
+    activity.set(SessionId('second'), [{ kind: 'schedule', items: [{ id: 'reminder-1', label: 'stand-up' }] }])
     expect(await inspect()).toEqual({ activeTasks: false, scheduledTasks: true })
-    expect(asked).toEqual([brandString<SessionId>('first'), brandString<SessionId>('second')])
+    expect(asked).toEqual([SessionId('first'), SessionId('second')])
   })
 
   it('reports both when a running session also holds a reminder', async () => {
     agents.push(agent('both', 'running'))
-    activity.set(brandString<SessionId>('both'), [{ kind: 'job', items: [{ id: 'bash-1' }] }, { kind: 'schedule', items: [{ id: 'reminder-2' }] }])
+    activity.set(SessionId('both'), [{ kind: 'job', items: [{ id: 'bash-1' }] }, { kind: 'schedule', items: [{ id: 'reminder-2' }] }])
     expect(await inspect()).toEqual({ activeTasks: true, scheduledTasks: true })
   })
 

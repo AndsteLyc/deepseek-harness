@@ -8,7 +8,6 @@
     "src"
   ],
   "references": [
-    { "path": "../../packages/host/authentication-desktop" },
     { "path": "../../vendor/cordis" },
     { "path": "../../packages/core/agent" },
     { "path": "../../packages/jobs/jobs" },
