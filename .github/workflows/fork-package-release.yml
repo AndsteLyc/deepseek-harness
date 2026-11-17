@@ -45,8 +45,33 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/fork-sync-upstream.yml/disable"
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/actions/workflows/fork-package-macos.yml/disable"
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process'
+          try {
+            const repo = process.env.GITHUB_REPOSITORY
+            const api = (...args) => execFileSync('gh', ['api', ...args], { encoding: 'utf8' })
+            const pages = JSON.parse(api('--paginate', '--slurp', `repos/${repo}/actions/workflows?per_page=100`))
+            const workflows = pages.flatMap(page => page.workflows)
+            for (const name of ['fork-sync-upstream.yml', 'fork-package-macos.yml']) {
+              const workflow = workflows.find(item => item.path === `.github/workflows/${name}`)
+              if (workflow === undefined) {
+                console.log(`${name}: no registered legacy workflow`)
+              } else if (workflow.state === 'active') {
+                api('--method', 'PUT', `repos/${repo}/actions/workflows/${workflow.id}/disable`)
+                console.log(`${name}: disabled workflow ${workflow.id}`)
+              } else if (['deleted', 'disabled_fork', 'disabled_inactivity', 'disabled_manually'].includes(workflow.state)) {
+                console.log(`${name}: already ${workflow.state}`)
+              } else {
+                throw new Error(`Unexpected state for ${name}: ${workflow.state}`)
+              }
+            }
+          } catch (error) {
+            const diagnostic = `${error.message}\n${error.stderr?.toString() ?? ''}`.trim()
+            const annotation = diagnostic.slice(-12000).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
+            console.log(`::error title=Legacy workflow retirement::${annotation}`)
+            process.exit(1)
+          }
+          JS
 
       - uses: pnpm/action-setup@v5.0.0
         with:
