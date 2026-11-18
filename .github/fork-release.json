@@ -1,5 +1,5 @@
 {
-  "upstreamTag": "dsh-v0.2.2-rc.3",
+  "upstreamTag": "dsh-v0.2.2-rc.4",
   "customPaths": [
     "apps/desktop/resources/icon-macos.png",
     "apps/desktop/resources/icon-windows.png",
@@ -34,5 +34,5 @@
     ".agents/notes/archived/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md",
     ".agents/notes/archived/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.zh.md"
   ],
-  "upstreamTree": "77ab54bbce37988207baa603b1d39aa9db9aeaaa"
+  "upstreamTree": "6778b1f1e75fde6d62f69d345792bf08e32178d4"
 }
