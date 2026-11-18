@@ -478,7 +478,11 @@ export async function packageTarget(
         { cwd: APP_ROOT, env: electronBuilderEnv, timeoutMs: 60_000 })
     })
   }
-  await execute(invocation.unsigned ? ['run', 'build', '--profile', 'local'] : ['run', 'build:official'], buildEnv, REPOSITORY_ROOT)
+  const artifactsOnly = invocation.unsigned && environment.DSH_DESKTOP_PACKAGE_ARTIFACTS_ONLY === '1'
+  const buildCommand = invocation.unsigned
+    ? ['run', 'build', '--profile', 'local', ...(artifactsOnly ? ['--scope', 'artifacts'] : [])]
+    : ['run', 'build:official']
+  await execute(buildCommand, buildEnv, REPOSITORY_ROOT)
   let preparationFailure: { error: unknown } | undefined
   const executePreparation = async (args: readonly string[], env: NodeJS.ProcessEnv, cwd?: string): Promise<void> => {
     if (preparationFailure !== undefined) throw preparationFailure.error

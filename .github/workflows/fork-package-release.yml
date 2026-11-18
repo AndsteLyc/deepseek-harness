@@ -132,6 +132,8 @@ jobs:
         id: package
         env:
           DSH_TELEMETRY_DISABLED: '1'
+          DSH_DESKTOP_PACKAGE_ARTIFACTS_ONLY: '1'
+          DSH_DESKTOP_SMOKE_SKIP_OFFICE_OPERATIONS: '1'
         run: bash .github/scripts/macos-package-diagnostics.sh run .local/packaging-diagnostics/time.log pnpm run package:desktop:mac:x64:unsigned
 
       - name: Record packaging host resources after build

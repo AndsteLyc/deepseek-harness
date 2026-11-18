@@ -31,7 +31,7 @@ export function assertOfficeSkillsLoadable(results: ReadonlyArray<{ readonly nam
 
 /**
  * Check CLI package operations, Host startup, its frontend, external plugins, packaged Office skill loading,
- * and real Office rendering, conversion, and recalculation.
+ * and real Office rendering, conversion, and recalculation unless unsigned packaging opts out.
  * @param root - Materialized dsh resources.
  * @param node - Prepared target Electron executable.
  * @param runtime - Verified resource descriptor.
@@ -42,6 +42,8 @@ export function assertOfficeSkillsLoadable(results: ReadonlyArray<{ readonly nam
 export async function smokeDesktopRuntime(
   root: string, node: string, runtime: DesktopRuntimeDescriptor, environment: NodeJS.ProcessEnv, resourcesRuntime: string,
 ): Promise<void> {
+  const skipOfficeOperations = environment.DSH_DESKTOP_UNSIGNED === '1'
+    && environment.DSH_DESKTOP_SMOKE_SKIP_OFFICE_OPERATIONS === '1'
   const home = mkdtempSync(join(tmpdir(), 'dsh-desktop-smoke-'))
   const profile = join(home, 'profiles', 'desktop')
   const hostEnvironment = {
@@ -88,13 +90,16 @@ export function apply(ctx) {
     await runCli(['remove', installedName])
     if (existsSync(installedEntry)) throw new Error('desktop runtime: CLI did not remove the local plugin')
     console.log('desktop runtime: CLI offline plugin installation and removal passed')
-    const primary = join(resourcesRuntime, 'primary-runtime')
-    const dependencies = workspaceDependencyPaths(primary, await readPrimaryRuntime(primary))
-    await promisify(execFile)(dependencies.python, ['-I', '-B',
-      fileURLToPath(new URL('../tests/fixtures/office-conversion-inputs.py', import.meta.url)), home],
-    { env: environment, timeout: 120_000, windowsHide: true })
-    const inputs = ['docx', 'xlsx', 'pptx'].map(extension => ({ extension,
-      bytes: readFileSync(join(home, `input.${extension}`)).toString('base64') }))
+    let inputs: { extension: string; bytes: string }[] = []
+    if (!skipOfficeOperations) {
+      const primary = join(resourcesRuntime, 'primary-runtime')
+      const dependencies = workspaceDependencyPaths(primary, await readPrimaryRuntime(primary))
+      await promisify(execFile)(dependencies.python, ['-I', '-B',
+        fileURLToPath(new URL('../tests/fixtures/office-conversion-inputs.py', import.meta.url)), home],
+      { env: environment, timeout: 120_000, windowsHide: true })
+      inputs = ['docx', 'xlsx', 'pptx'].map(extension => ({ extension,
+        bytes: readFileSync(join(home, `input.${extension}`)).toString('base64') }))
+    }
     const cordis = runtime.sharedPackages.find(entry => entry.name === '@deepseek-ai/cordis')
     if (cordis === undefined) throw new Error('desktop runtime: missing shared Cordis package')
     writeFileSync(join(plugin, 'package.json'), JSON.stringify({
@@ -210,6 +215,10 @@ export function apply(ctx) {
     const loadedSkills = await skills.json() as { name: string; bytes: number }[]
     assertOfficeSkillsLoadable(loadedSkills)
     console.log('desktop runtime: packaged Office skills listed and loaded')
+    if (skipOfficeOperations) {
+      console.log('desktop runtime: Office rendering, conversion, and recalculation checks skipped for unsigned packaging')
+      return
+    }
     for (const { extension } of inputs) {
       const converted = await fetch(new URL(`/desktop-smoke-office/${extension}`, ready.url), {
         headers: { cookie }, signal: AbortSignal.timeout(OFFICE_SMOKE_TIMEOUT_MS),

@@ -230,6 +230,15 @@ it.each(['mac-arm64', 'mac-x64', 'win-x64'] as const)('selects branding from the
   }
 })
 
+it.each([true, false])('limits artifact-only builds to unsigned packaging (unsigned=%s)', async (unsigned) => {
+  const { run, stages } = supervisor()
+  const invocation = parseDesktopPackageInvocation(['mac-x64', ...(unsigned ? ['--unsigned'] : [])], 'darwin', 'x64')
+  await packageTarget(invocation, { ...environment, DSH_DESKTOP_PACKAGE_ARTIFACTS_ONLY: '1' }, run)
+  expect(stages[0]).toBe(unsigned ? 'run build --profile local --scope artifacts' : 'run build:official')
+  expect(stages).toContain('run prepare:dsh')
+  expect(stages).toContain(`exec tsx scripts/smoke-packaged-runtime.ts${unsigned ? ' --unsigned' : ''}`)
+})
+
 it.each([
   ['mac-arm64', 'run build --profile local'],
   ['win-x64', 'run build --profile local'],
