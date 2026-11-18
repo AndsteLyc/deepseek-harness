@@ -25,8 +25,10 @@ import {
   shell,
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
+  type Rectangle,
 } from 'electron'
 import { resolveDesktopPaths } from './paths.ts'
+import { restoreWindowBounds, trackWindowBounds } from './window-placement.ts'
 import { DesktopProjectManager } from './project-manager.ts'
 import { DesktopHostFatalError, DesktopHostProcess, DesktopHostUncleanExitError } from './host-process.ts'
 import { DesktopPlatformView, PLATFORM_IPC, platformBounds } from './platform-view.ts'
@@ -261,14 +263,17 @@ function platformLoginUrl(authorizeUrl: string): string {
   return url.href
 }
 
-function createWindow(preload: string, show = false, primary = false): BrowserWindow {
+const mainWindowMinimum = { width: 520, height: 600 }
+
+function createWindow(preload: string, bounds: Rectangle | undefined): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 820,
-    minWidth: 520,
-    minHeight: 600,
-    show,
-    ...(process.platform === 'win32' && primary ? {
+    ...bounds,
+    minWidth: Math.min(mainWindowMinimum.width, bounds?.width ?? Infinity),
+    minHeight: Math.min(mainWindowMinimum.height, bounds?.height ?? Infinity),
+    show: false,
+    ...(process.platform === 'win32' ? {
       backgroundColor: chromeFallbackFill(),
       titleBarStyle: 'hidden' as const,
       titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
@@ -291,7 +296,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
-      webviewTag: primary,
+      webviewTag: true,
       devTools: true,
     },
   })
@@ -310,7 +315,7 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     // current state so a fullscreen reload does not fall back to windowed CSS.
     window.webContents.on('did-finish-load', sendFullscreen)
   }
-  if (process.platform === 'win32' && primary) {
+  if (process.platform === 'win32') {
     const updateBackground = (): void => {
       if (!window.isDestroyed()) window.setBackgroundColor(chromeFallbackFill())
     }
@@ -407,6 +412,7 @@ async function main(): Promise<void> {
   let startup: Promise<void> | undefined
   let workspaceRecovery: Promise<void> | undefined
   let mainWindow: BrowserWindow | undefined
+  let saveMainWindowBounds: (() => void) | undefined
   let welcomeWindow: BrowserWindow | undefined
   const installFileDrag = (): (() => Promise<void>) => installDesktopFileDrag(
     event => assertProductSender(event),
@@ -1320,14 +1326,17 @@ async function main(): Promise<void> {
     }
   }
   const createMainWindow = (): BrowserWindow => {
-    const window = createWindow(appPreload, false, true)
+    const userData = app.getPath('userData')
+    const window = createWindow(appPreload, restoreWindowBounds(userData, mainWindowMinimum))
+    const saveWindowBounds = trackWindowBounds(userData, window)
+    saveMainWindowBounds = saveWindowBounds
     mainWindow = window
     browserGuests.bind(window, (guest, name) => shortcuts.attachGuest(window, guest, name))
     shortcuts.attach(window)
     window.on('focus', automaticCheck)
     // Closing hides: the page and the Host keep running, and the next show resumes the same document.
     window.on('close', (event) => {
-      if (quitting || shellInstallerOwnsQuit || sessionEnding) return
+      if (quitting || shellInstallerOwnsQuit || sessionEnding) { saveWindowBounds(); return }
       event.preventDefault()
       if (updateDialog.isOpen) { updateDialog.focus(); return }
       const hide = (): void => {
@@ -1339,7 +1348,7 @@ async function main(): Promise<void> {
     if (process.platform === 'win32') {
       // Shutdown, restart, and log-off must not wait on a confirmation. query-session-end is only a
       // question that another application can veto without any follow-up message, so it does not count.
-      window.on('session-end', () => { sessionEnding = true })
+      window.on('session-end', () => { sessionEnding = true; saveWindowBounds() })
     } else {
       // The macOS power-off notification arrives before the terminate request; a cancelled shutdown
       // leaves the process running, and user attention on the window shows the session continues.
@@ -1501,6 +1510,7 @@ async function main(): Promise<void> {
   const finishQuit = (): void => {
     quitting = true
     shuttingDown = true
+    saveMainWindowBounds?.()
     updateJournal?.action('quit-requested')
     quitConfirmation.dispose()
     backgroundNotice?.dispose()
@@ -1524,6 +1534,7 @@ async function main(): Promise<void> {
   app.on('before-quit', (event) => {
     if (shellInstallerOwnsQuit) {
       shuttingDown = true
+      saveMainWindowBounds?.()
       quitConfirmation.dispose()
       backgroundNotice?.dispose()
       updateJournal?.action('quit-requested')

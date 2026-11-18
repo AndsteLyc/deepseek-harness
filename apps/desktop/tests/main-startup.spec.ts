@@ -7,7 +7,7 @@ import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import type { MenuItemConstructorOptions, MessageBoxOptions } from 'electron'
+import type { BrowserWindowConstructorOptions, MenuItemConstructorOptions, MessageBoxOptions, Rectangle } from 'electron'
 import { DESKTOP_IPC, type DesktopUpdateState } from '../src/ipc.ts'
 import { MANDATORY_IPC } from '../src/mandatory-update-ipc.ts'
 import { DesktopHostFatalError, DesktopHostUncleanExitError } from '../src/host-process.ts'
@@ -46,6 +46,12 @@ const harness = await vi.hoisted(async () => {
   const windows: FakeWindow[] = []
   let windowFailure: Error | undefined
   const powerMonitor = new EventEmitter()
+  const display = { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, workArea: { x: 0, y: 0, width: 1920, height: 1040 } }
+  const screen = {
+    getAllDisplays: vi.fn(() => [display]),
+    getDisplayMatching: vi.fn((_bounds: Rectangle) => display),
+    getDisplayNearestPoint: vi.fn((_point: Pick<Rectangle, 'x' | 'y'>) => display),
+  }
   const hosts: FakeHost[] = []
   const handlers = new Map<string, InvokeHandler>()
   let pluginsEnabled = false
@@ -99,19 +105,20 @@ const harness = await vi.hoisted(async () => {
       }),
     })
     readonly shown = deferred()
-    readonly show = vi.fn(() => { this.shown.resolve() })
-    readonly hide = vi.fn()
+    readonly show = vi.fn(() => { this.emit('show'); this.shown.resolve() })
+    readonly hide = vi.fn(() => { this.emit('hide') })
     readonly focus = vi.fn()
     readonly moveTop = vi.fn()
     readonly setAlwaysOnTop = vi.fn()
     readonly restore = vi.fn()
     readonly setSize = vi.fn()
     readonly getBounds = vi.fn(() => ({ x: 0, y: 0, width: 800, height: 700 }))
+    readonly getNormalBounds = vi.fn(() => this.getBounds())
     readonly setMinimumSize = vi.fn()
     readonly setTitleBarOverlay = vi.fn()
     readonly setVibrancy = vi.fn()
     readonly setBackgroundColor = vi.fn()
-    constructor(readonly options: { show: boolean; modal?: boolean }) {
+    constructor(readonly options: BrowserWindowConstructorOptions) {
       super(); if (windowFailure !== undefined) throw windowFailure; windows.push(this)
     }
     isDestroyed() { return this.destroyed }
@@ -221,7 +228,7 @@ const harness = await vi.hoisted(async () => {
   const shellDialog = { isOpen: false, focus: vi.fn() }
   return {
     failWindow(error: Error) { windowFailure = error },
-    windows, views, hosts, handlers, app, FakeWindow, FakeView, FakeHost, powerMonitor, nativeTheme, analytics,
+    windows, views, hosts, handlers, app, FakeWindow, FakeView, FakeHost, powerMonitor, nativeTheme, analytics, screen,
     trays, FakeTray, backgroundNotice, shellDialog,
     menu, popup, socketHeaders: vi.fn(), connectWelcome: vi.fn(), removeLegacyHostCookies: vi.fn(async () => {}), hostCookies: {},
     loginShell, readLoginShell, updateCheck, updateDownload, updateInstall,
@@ -317,6 +324,7 @@ vi.mock('electron', () => ({
   dialog: harness.dialog,
   shell: { openExternal: harness.openExternal, showItemInFolder: harness.showItemInFolder },
   nativeTheme: harness.nativeTheme,
+  screen: harness.screen,
   ipcMain: {
     on: harness.ipcOn,
     handle: (channel: string, handler: InvokeHandler) => {
@@ -503,6 +511,86 @@ afterEach(async () => {
 })
 
 describe('desktop main startup', () => {
+  const external = { id: 2, bounds: { x: -1920, y: 0, width: 1920, height: 1080 },
+    workArea: { x: -1920, y: 0, width: 1920, height: 1040 } }
+  const savedBounds = { x: -1720, y: 80, width: 1100, height: 760 }
+  const savedPlacement = { bounds: savedBounds, displayId: external.id, displayOrigin: { x: external.bounds.x, y: external.bounds.y } }
+  const placementPath = () => join(harness.app.getPath('userData'), 'desktop', 'window-placement.json')
+
+  it('saves the latest move and resize after each burst of events', async () => {
+    await readyForUpdate()
+    const window = harness.windows[0]!
+    await window.shown.promise
+    harness.screen.getDisplayMatching.mockReturnValueOnce(external).mockReturnValueOnce(external)
+    window.getNormalBounds.mockReturnValue(savedBounds)
+    window.emit('move')
+    await vi.advanceTimersByTimeAsync(200)
+    const moved = { ...savedBounds, x: savedBounds.x + 20 }
+    window.getNormalBounds.mockReturnValue(moved)
+    window.emit('move')
+    await vi.advanceTimersByTimeAsync(249)
+    expect(existsSync(placementPath())).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(JSON.parse(readFileSync(placementPath(), 'utf8'))).toEqual({ ...savedPlacement, bounds: moved })
+
+    const resized = { ...moved, width: 1000, height: 720 }
+    window.getNormalBounds.mockReturnValue(resized)
+    window.emit('resize')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(JSON.parse(readFileSync(placementPath(), 'utf8'))).toEqual({ ...savedPlacement, bounds: resized })
+  })
+
+  it.each([true, false])('saves final bounds on confirmed quit (hidden=%s)', async (hidden) => {
+    const host = await readyForUpdate()
+    const window = harness.windows[0]!
+    await window.shown.promise
+    window.getNormalBounds.mockReturnValue(savedBounds)
+    harness.screen.getDisplayMatching.mockReturnValueOnce(external)
+    if (hidden) window.close()
+    expect(existsSync(placementPath())).toBe(false)
+
+    host.inspectQuit.mockResolvedValue({ activeTasks: true, scheduledTasks: false })
+    harness.app.quit()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(harness.dialog.showMessageBox).toHaveBeenCalledOnce()
+    expect(existsSync(placementPath())).toBe(false)
+
+    harness.dialog.showMessageBox.mockResolvedValueOnce({ response: 0, checkboxChecked: false })
+    harness.closeWindowsOnQuit = true
+    if (!hidden) window.emit('resize')
+    harness.app.quit()
+    await host.stopping.promise
+    expect(JSON.parse(readFileSync(placementPath(), 'utf8'))).toEqual(savedPlacement)
+    host.exited.resolve()
+    await harness.quitCompleted.promise
+    await vi.advanceTimersByTimeAsync(250)
+    expect(window.getNormalBounds).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    ['the original display', external, savedBounds],
+    ['the nearest remaining display', { id: 3, bounds: { x: -1280, y: 0, width: 1280, height: 720 },
+      workArea: { x: -1280, y: 20, width: 1280, height: 680 } }, { x: -1280, y: 20, width: 1100, height: 680 }],
+  ] as const)('opens on %s using the saved placement', async (_name, target, expected) => {
+    mkdirSync(join(harness.app.getPath('userData'), 'desktop'), { recursive: true })
+    writeFileSync(placementPath(), JSON.stringify(savedPlacement))
+    harness.screen.getAllDisplays.mockReturnValueOnce([harness.screen.getDisplayMatching(savedBounds), target])
+    if (target.id !== 2) harness.screen.getDisplayNearestPoint.mockReturnValueOnce(target)
+    await readyForUpdate()
+    expect(harness.windows[0]!.options).toMatchObject(expected)
+    if (target.id === 2) expect(harness.screen.getDisplayNearestPoint).not.toHaveBeenCalled()
+    else expect(harness.screen.getDisplayNearestPoint).toHaveBeenCalledWith({ x: -1170, y: 460 })
+  })
+
+  it('uses default bounds for an invalid saved placement', async () => {
+    mkdirSync(join(harness.app.getPath('userData'), 'desktop'), { recursive: true })
+    writeFileSync(placementPath(), JSON.stringify({ ...savedPlacement, bounds: { ...savedBounds, height: -1 } }))
+    await readyForUpdate()
+    const { x, y, width, height } = harness.windows[0]!.options
+    expect({ x, y, width, height }).toEqual({ x: undefined, y: undefined, width: 1280, height: 820 })
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('using default bounds'), expect.any(Error))
+  })
+
   it.each([true, false])('selects the package manager before Host startup (packaged=%s)', async (packaged) => {
     harness.app.isPackaged = packaged
     await readyForUpdate()
