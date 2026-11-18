@@ -3,6 +3,9 @@ name: Fork · Package official macOS x64
 on:
   push:
     branches: [custom]
+    paths-ignore:
+      - '.github/FORK.md'
+      - '.github/FORK.zh.md'
   workflow_call:
     inputs:
       ref:
@@ -37,7 +40,7 @@ jobs:
         uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.ref }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: Stop legacy automatic development merges
@@ -100,7 +103,7 @@ jobs:
       - name: Fetch pinned official release tag
         run: |
           tag="$(node -p "require('./.github/fork-release.json').upstreamTag")"
-          git fetch --no-tags https://github.com/deepseek-ai/deepseek-harness.git "refs/tags/$tag:refs/tags/$tag"
+          git fetch --depth=1 --no-tags https://github.com/deepseek-ai/deepseek-harness.git "refs/tags/$tag:refs/tags/$tag"
 
       - name: Verify official release baseline
         run: |

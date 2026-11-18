@@ -16,6 +16,8 @@ The synchronizer applies the product changes from the old official release to th
 
 GitHub schedules require this workflow on the repository's default branch. Set the default branch to `custom` to activate the six-hour check. The packaging job disables both legacy workflows, whose default-branch copies could otherwise merge development code or publish it without the release check. The disabled legacy sync workflow cannot be manually dispatched; synchronization of the separate `master` mirror then requires local Git.
 
+Pushes to `custom` trigger macOS packaging unless all changed paths are `.github/FORK.md` or `.github/FORK.zh.md`. Manual runs and calls from the release synchronizer can package the requested ref. The packaging job fetches the selected commit and the pinned official tag at depth one for the baseline check.
+
 ## Packaging caches and diagnostics
 
 Both release workflows configure a stable pnpm store before restoring the lockfile-keyed dependency cache. Packaging also caches Desktop's downloaded runtime archives, its separate pnpm store, and electron-builder tools. Desktop cache keys separate operating systems and architectures; lockfile or runtime input changes create a new entry, with older entries available for reuse of unchanged downloads and dependencies. Compiled outputs and installation packages are rebuilt.
