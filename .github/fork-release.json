@@ -1,5 +1,5 @@
 {
-  "upstreamTag": "dsh-v0.2.2-rc.4",
+  "upstreamTag": "dsh-v0.2.2-rc.5",
   "customPaths": [
     "apps/desktop/README.i18n.yaml",
     "apps/desktop/README.md",
@@ -42,5 +42,5 @@
     ".agents/notes/archived/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md",
     ".agents/notes/archived/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.zh.md"
   ],
-  "upstreamTree": "6778b1f1e75fde6d62f69d345792bf08e32178d4"
+  "upstreamTree": "6ec0fcdcaf38bdf8ffa6675e30b036dc104a1ece"
 }
