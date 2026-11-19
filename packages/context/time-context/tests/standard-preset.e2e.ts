@@ -21,12 +21,12 @@ async function journalPaths(dir: string): Promise<string[]> {
 
 function expectClockOnly(text: string): void {
   expect(text.split('\n')).toHaveLength(2)
-  expect(text).toMatch(/^Time sampled while preparing turn 1, step 1: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+08:00\[Asia\/Singapore\]\n/)
+  expect(text).toMatch(/^Time sampled while preparing turn 1, step 1: \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}-0[45]:00\[America\/New_York\]\n/)
   expect(text).toContain('Elapsed since the preceding model-visible message:')
   expect(text).not.toContain('Browser time zone for this request:')
 }
 
-it('keeps the shipped standard preset clock without the browser policy in requests and logs', async () => {
+it('uses the reported browser zone in standard preset requests and logs without adding the policy line', async () => {
   const { stderr } = await runLoaderSmoke({
     label: 'standard preset time-context',
     tempDirPrefix: 'standard-preset-clock-',

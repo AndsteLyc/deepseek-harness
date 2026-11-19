@@ -21,7 +21,7 @@ try {
   try {
     handle.agent.followup(createUserMessage({
       content: [{ type: 'text', text: 'Read the clock.' }],
-      source: { kind: 'user' },
+      source: { kind: 'user', rpcId: 'standard-preset-clock' as never, clientTimeZone: 'America/New_York' },
     }))
     await handle.agent.whenIdle()
     await ctx.sessions.flush(handle.agent.session)

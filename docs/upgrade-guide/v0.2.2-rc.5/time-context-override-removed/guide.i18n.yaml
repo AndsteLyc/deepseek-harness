@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.2-rc.5/time-context-override-removed/guide.md
+/:
+  en: 7ab21ffdfbc829ff
+  zh: be4ce324d9853609
+/time-context-removes-overridetimezone:
+  en: 26d969fbe1224c3e
+  zh: de63e03be1e72a9c
+/time-context-removes-overridetimezone/change:
+  en: 4102e3b373973b5f
+  zh: dd18f280839d8f2b
+/time-context-removes-overridetimezone/migration:
+  en: b6194dc4882ab5d8
+  zh: 9cdb6a80f04be47b

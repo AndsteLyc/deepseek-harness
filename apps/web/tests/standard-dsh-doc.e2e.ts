@@ -5,7 +5,7 @@ import { dirname } from 'node:path'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
 import { assertFixtureInventory, fixtureUserPrompts, launchWebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage } from './support.ts'
+import { connectFreshWorkspace } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/standard-dsh-doc/session.v4.jsonl', import.meta.url))
 
@@ -14,7 +14,7 @@ it('lists dsh-doc once without loading instructions or calling tools for an ordi
   try {
     const browser = await chromium.launch()
     try {
-      const page = await newEnglishPage(browser)
+      const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'America/New_York' })
       await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
       await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
       await connectFreshWorkspace(page, scaffold.workspaceCwd)
@@ -28,6 +28,11 @@ it('lists dsh-doc once without loading instructions or calling tools for an ordi
       const agent = scaffold.ctx.agents.get(sessionId)
       if (agent === undefined) throw new Error('standard documentation session is missing')
       const events = agent.session.snapshotEvents()
+      const readings = events.flatMap(event => event.type === 'user/message'
+        && event.data.source.kind === 'time-context' ? event.data.content : [])
+      expect(readings).toHaveLength(1)
+      const reading = readings[0]
+      expect(reading?.type === 'text' ? reading.text : undefined).toMatch(/-0[45]:00\[America\/New_York\]\nElapsed since/)
       expect(events.filter(event => event.type === 'tool/call')).toEqual([])
       const catalogs = events.flatMap(event => event.type === 'user/message'
         && event.data.source.kind === 'skill-catalog' ? [event.data] : [])
