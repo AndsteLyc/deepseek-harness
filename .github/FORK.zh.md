@@ -28,6 +28,8 @@ macOS 打包任务在构建前后记录主机 CPU 和内存信息、Swap 使用�
 
 无正式签名的 macOS x64 打包流程构建应用产物，跳过测试和脚本的汇总类型检查。官方版本同步流程执行完整构建。打包流程也跳过已打包运行时的 Office 渲染、转换和重算测试。运行时冒烟检查覆盖 Host 启动、插件安装和 Office 技能加载。
 
+Intel 打包流程从与桌面版本号相同的官方 npm 包中取出已签名的 Computer Use 辅助程序。上传 DMG 前，流程挂载磁盘映像，校验安装包内的辅助程序与已验签的副本一致。缺少辅助程序或摘要不一致都会阻止发布。
+
 本地检查前，先从官方仓库获取声明中的基线标签；两条工作流会显式执行这一步。在仓库根目录运行 `node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs` 和 `node .github/scripts/verify-release-base.mjs`。打包流程在安装依赖前检查基线，并在打包后的运行时冒烟检查成功后才发布。
 
 首次基线调整使用 `custom` 上的普通提交，之前的提交保留在 Git 历史中。因此，提交数量仍包含之前合并的上游历史，不能用来表示当前源码与官方发布版本的差异。

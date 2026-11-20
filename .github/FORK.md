@@ -28,6 +28,8 @@ The macOS packaging job records host CPU and memory information, swap usage, fre
 
 The unsigned macOS x64 workflow builds the application artifacts and skips the aggregate type checks for tests and scripts. Official release synchronization runs the complete build. The packaging workflow also skips the packaged Office rendering, conversion, and recalculation probes. Runtime smoke checks cover Host startup, plugin installation, and Office skill loading.
 
+The Intel workflow stages the signed Computer Use helper from the official npm provider at the Desktop version. Before uploading the DMG, it mounts the image and verifies that the installed helper matches the signed copy. A missing helper or digest mismatch stops publication.
+
 Fetch the declared baseline tag from the official repository before local checks; both workflows do this explicitly. Run `node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs` and `node .github/scripts/verify-release-base.mjs` from the repository root. Packaging checks its baseline before dependency installation and publishes only after the packaged runtime smoke checks succeed.
 
 The initial baseline adjustment is an ordinary commit on `custom`; previous commits remain in Git history. Commit counts therefore include earlier upstream merges and do not describe the current source differences from the official release.

@@ -128,6 +128,10 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Stage official Intel Computer Use helper
+        id: cua
+        run: node .github/scripts/stage-cua-x64.mjs
+
       - name: Record packaging host resources
         run: bash .github/scripts/macos-package-diagnostics.sh snapshot .local/packaging-diagnostics/before.log
 
@@ -152,6 +156,11 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
+
+      - name: Verify Computer Use in the finished DMG
+        env:
+          FORK_CUA_BUNDLE: ${{ steps.cua.outputs.bundle }}
+        run: bash .github/scripts/verify-cua-dmg.sh apps/desktop/.desktop-build/targets/mac-x64/unsigned-artifacts/*.dmg
 
       - name: Upload DMG
         uses: actions/upload-artifact@v7.0.1
