@@ -38,6 +38,12 @@
 .readOnly {
   /* A static caption has no icon-only menu for revealing its values. */
   --dsh-composer-model-text-display: block;
+  max-width: min(360px, 50cqi);
+}
+
+.readOnly .triggerEffort {
+  flex: none;
+  max-width: 45%;
 }
 
 @media (hover: hover) {
