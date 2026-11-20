@@ -6,7 +6,8 @@
  */
 
 import { z } from 'zod'
-import { SessionSeq } from '@deepseek-ai/dsh-session'
+import { SessionLogOffset, SessionSeq, type SessionHeader } from '@deepseek-ai/dsh-session'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm/brand'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { foldSubagentDescriptor } from './descriptor.ts'
@@ -109,36 +110,41 @@ export const subagentTimingProjectionDefinition = {
 
 /** Descriptor identity retained by the subagent projection. */
 export interface IdentityState {
+  /** Inherited descriptors identify ancestors but cannot supply this child's model. */
+  inheritedEventCount: SessionLogOffset
   /** Identity from the last valid descriptor; absent before one, and after an invalid one. */
   identity?: SubagentIdentityProjection | undefined
 }
 
-// The cast bridges only the optional-label arm: Zod's optional output
-// includes explicit `undefined`, which exactOptionalPropertyTypes excludes
-// from the public interface. The no-value state itself is the serializable
-// `null` arm — never `undefined` — so every registry read and push frame
-// survives JSON.stringify losslessly.
-const identityValueSchema = z.discriminatedUnion('mode', [
+const modelSelectionSchema = z.object({
+  provider: z.string(),
+  model: z.string(),
+  reasoningEffort: z.string().transform(ReasoningEffortId).exactOptional(),
+}).strict()
+const identityValueSchema: z.ZodType<SubagentIdentityProjection> = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('one-shot'),
-    label: z.string().optional(),
+    label: z.string().exactOptional(),
+    modelSelection: modelSelectionSchema.exactOptional(),
     seq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).transform(SessionSeq),
   }).strict(),
   z.object({
     mode: z.literal('continuable'),
     label: z.string(),
+    modelSelection: modelSelectionSchema.exactOptional(),
     seq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).transform(SessionSeq),
   }).strict(),
-]) as unknown as z.ZodType<SubagentIdentityProjection>
+])
 
 const identitySchema = identityValueSchema.nullable()
 
 const identityStateSchema: z.ZodType<IdentityState> = z.object({
+  inheritedEventCount: z.number().int().nonnegative().transform(SessionLogOffset),
   identity: identityValueSchema.optional(),
 }).strict()
 
 /** Interpret one `subagent/descriptor` event's identity; no value when the payload cannot be trusted. */
-function descriptorIdentity(event: SessionEvent): SubagentIdentityProjection | undefined {
+function descriptorIdentity(event: SessionEvent, own: boolean): SubagentIdentityProjection | undefined {
   let descriptor: SubagentDescriptorData | undefined
   try {
     descriptor = foldSubagentDescriptor([event])
@@ -154,7 +160,15 @@ function descriptorIdentity(event: SessionEvent): SubagentIdentityProjection | u
       ...descriptor.label !== undefined ? { label: descriptor.label } : {},
       seq: event.seq,
     }
-    : { mode: 'continuable', label: descriptor.label, seq: event.seq }
+    : {
+      mode: 'continuable', label: descriptor.label, seq: event.seq,
+      ...own && descriptor.agentProvider !== undefined && descriptor.agentModel !== undefined ? {
+        modelSelection: {
+          provider: descriptor.agentProvider, model: descriptor.agentModel,
+          ...descriptor.agentReasoningEffort === undefined ? {} : { reasoningEffort: descriptor.agentReasoningEffort },
+        },
+      } : {},
+    }
 }
 
 /**
@@ -171,14 +185,19 @@ function descriptorIdentity(event: SessionEvent): SubagentIdentityProjection | u
 export const subagentIdentityProjectionDefinition = {
   key: 'subagent',
   stateSchema: identityStateSchema,
-  init: () => ({}),
+  init: (_header: SessionHeader, inheritedEventCount: SessionLogOffset): IdentityState => ({ inheritedEventCount }),
   apply: (state, event) => {
-    if (event.type !== 'subagent/descriptor') return state
-    const identity = descriptorIdentity(event)
-    return identity === undefined ? {} : { identity }
+    const { identity, inheritedEventCount } = state
+    if (event.type === 'subagent/descriptor') {
+      return { inheritedEventCount, identity: descriptorIdentity(event, event.seq >= inheritedEventCount) }
+    }
+    if (event.type !== 'request/header' || identity === undefined || identity.seq < inheritedEventCount) return state
+    const { provider, model, reasoningEffort } = event.data.header.config
+    const previous = identity.modelSelection
+    if (previous?.provider === provider && previous.model === model && previous.reasoningEffort === reasoningEffort) return state
+    const modelSelection = { provider, model, ...reasoningEffort === undefined ? {} : { reasoningEffort } }
+    return { inheritedEventCount, identity: { ...identity, modelSelection } }
   },
   wire: { viewSchema: identitySchema, view: state => state.identity ?? null },
-  // Bumped when the identity gained its `seq` field: an older checkpoint row
-  // would replay into a value the schema rejects, so it must refold instead.
-  stateVersion: 2,
+  stateVersion: 3,
 } satisfies ProjectionDefinition<'subagent', IdentityState>

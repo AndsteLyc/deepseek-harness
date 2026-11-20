@@ -37,6 +37,8 @@ DeepSeek 账号和 API Key 路由显示为独立提供方分组，各自展示�
 
 ### 模型与推理强度
 
+子智能体会话的输入框以只读文字显示该子智能体记录的模型和推理强度。会话没有记录强度时，只显示模型。
+
 按钮模型菜单仅在完整目录超过四个模型时显示搜索框；较小目录直接支持键盘导航，并在所有设备上聚焦当前模型或首个可用行。`/model` 命令始终保留搜索框。两个搜索框均按模型名称进行不区分大小写的匹配，支持按顺序输入不连续字符，并忽略首尾空格。每个提供方内的结果优先按前缀匹配、其次按匹配得分、最后按目录顺序排列。没有匹配项的分组会隐藏。空目录和无匹配结果均通过状态区域通知屏幕阅读器。方向键在各提供方分组的结果间循环移动高亮，焦点保留在搜索框；Enter 或 Tab 选定高亮项。左右方向键仍用于移动输入光标。打开时高亮当前模型或首个可用选项，修改搜索内容后高亮首个结果。重新打开模型面板会清空搜索内容。
 
 composer 菜单中的模型名称和推理等级均使用 400（regular）字重，包括选中项。搜索框沿用 command 弹窗的紧凑样式，在浅／深色主题下均保持背景和边框透明，不显示前置图标，占位文字使用 caption 色。主指针精度较低的设备使用 16px 搜索文字，避免 Safari 聚焦缩放；精细指针设备保留 12px。搜索内容非空时显示清除按钮；点击后恢复完整列表，并将焦点留在搜索框。
@@ -75,7 +77,7 @@ composer 菜单中的模型名称和推理等级均使用 400（regular）字重
 
 composer 的 `ModelSelect` 与 `/model` 选项构建器共用[提供方排序](src/client/provider-order.ts)，两个搜索框均在每个提供方内使用 `rankByName`。命令通过 [popupSelect API](../ui-commands/README.zh.md#use-this-package) 提供可选分组与 `searchMode: 'fuzzy-label'`；两个入口均使用 `MenuGroup`，并在渲染分组变化时重建其吸顶观察器。命令弹窗撑满 composer 浮层，按钮则保留紧凑菜单。
 
-两个入口共用一份由 `ModelDirectoryResolver`（`ctx.modelDirectories`）持有的会话级目录：`/model` popupSelect 贡献项（经 `ctx.commandUi` 注册）与 composer 的具名 `conversation.input.model` 位都经 `session.models` 加载会话的可用目录、经 `session.selectModel` 通过同一个 `ModelDirectory` 实例提交，因此任一入口所做的切换正是另一个入口接下来显示的。目录加载与选择共享一个代次计数器，旧响应不会覆盖新结果。目录把最近一次提交的选择发布为 `pending`，直到它完成或被连接重置作废；连接重置丢弃所有常驻投影，并在显示前重新拉取 Host 恢复的选择。目录按会话惰性解析，随会话作用域一并 dispose（资源释放）；已寻址 subagent 会话不公开任一入口。每份常驻目录都会直接在转发的 `llm/adapters-updated`、`llm/models-updated`、`settings/document-updated` 与凭据更新事件上重拉。
+两个入口共用一份由 `ModelDirectoryResolver`（`ctx.modelDirectories`）持有的会话级目录：`/model` popupSelect 贡献项（经 `ctx.commandUi` 注册）与 composer 的具名 `conversation.input.model` 位都经 `session.models` 加载会话的可用目录、经 `session.selectModel` 通过同一个 `ModelDirectory` 实例提交，因此任一入口所做的切换正是另一个入口接下来显示的。目录加载与选择共享一个代次计数器，旧响应不会覆盖新结果。目录把最近一次提交的选择发布为 `pending`，直到它完成或被连接重置作废；连接重置丢弃所有常驻投影，并在显示前重新拉取 Host 恢复的选择。目录按会话惰性解析，随会话作用域一并 dispose（资源释放）；已寻址 subagent 会话不允许通过这两个入口更换模型。每份常驻目录都会直接在转发的 `llm/adapters-updated`、`llm/models-updated`、`settings/document-updated` 与凭据更新事件上重拉。
 
 </details>
 

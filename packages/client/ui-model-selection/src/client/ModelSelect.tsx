@@ -40,6 +40,7 @@ import {
   IconDataOutlineRegular, IconWarningOutlineRegular, Input, isMobileDevice, rankByName, StateDot, Tag, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ModelDirectoryState } from './directory.ts'
 import type { ModelLabelOwner, ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 import { orderModelProviders } from './provider-order.ts'
@@ -54,21 +55,65 @@ interface EffortChoice {
   label: string
 }
 
-/**
- * Render the composer model seat.
- * @param props - owner share (locked) + injected face (shared directory
- * store/verbs) + the standard locale seat.
- * @returns the trigger and, while open, the two-level menu.
- */
-export function ModelSelect(
-  { locked, available, directory, load, select, resolveText, t, renderSlot }:
-  ModelSelectInjected & Pick<PropsRuntime<'conversation.input.model'>, 'locked'> & PropsLocale<'model'>
-    & Omit<PropsRenderSlots<'conversation.input.model.label' | 'conversation.input.model.options'>, 'SessionProvider'>,
+type ModelSeatProps = ModelSelectInjected & Pick<PropsRuntime<'conversation.input.model'>, 'locked'> & PropsLocale<'model'>
+  & Omit<PropsRenderSlots<'conversation.input.model.label' | 'conversation.input.model.options'>, 'SessionProvider'>
+type ProjectionProps = Pick<PropsRuntime<'conversation.input.model'>, 'useProjection'>
+
+function renderModelLabel(
+  { renderSlot, resolveText }: Pick<ModelSeatProps, 'renderSlot' | 'resolveText'>,
+  provider: ModelLabelOwner['provider'], model: ModelLabelOwner['model'],
+  placement: ModelLabelOwner['placement'], selected: boolean,
 ) {
+  return (
+    <span data-provider-id={provider.id} data-model-id={model.id}>
+      {renderSlot('conversation.input.model.label', {
+        provider, model, placement, selected,
+      }, {
+        fallback: model.badge === undefined ? model.name : (
+          <span className={css.badgedName}>
+            {placement === 'trigger' ? <><Tag className={css.badge} tone={model.badge.tone}>{resolveText(model.badge.text)}</Tag>{' '}</> : null}
+            <span className={css.badgedNameText}>{model.name}</span>
+            {placement === 'trigger' ? null : <>{' '}<Tag className={css.badge} tone={model.badge.tone}>{resolveText(model.badge.text)}</Tag></>}
+          </span>
+        ),
+      })}
+    </span>
+  )
+}
+
+/**
+ * Render the selected model control or the addressed child's read-only caption.
+ * @param props - session-scoped composer inputs and label contributions.
+ * @returns the selection control or recorded child model, when known.
+ */
+export function ModelSelect(props: ModelSeatProps & ({ available: true } | ProjectionProps)) {
+  const { directory } = props
   const state = useSyncExternalStore(
     fn => directory.subscribe(fn),
     () => directory.getSnapshot(),
   )
+  return props.available ? <EditableModelSelect {...props} state={state} /> : <ChildModelCaption {...props} groups={state.groups} />
+}
+
+function ChildModelCaption(props: ModelSeatProps & ProjectionProps & Pick<ModelDirectoryState, 'groups'>) {
+  const selection = props.useProjection('subagent', identity => identity?.modelSelection)
+  if (selection === undefined) return null
+  const group = props.groups.find(entry => entry.id === selection.provider)
+  const model = group?.models.find(entry => entry.id === selection.model)
+  const effortId = selection.reasoningEffort
+  const effort = model?.reasoning?.efforts.find(entry => entry.id === effortId)?.name ?? effortId
+  const name = model?.name ?? selection.model
+  return <span className={css.readOnly} data-provider-id={selection.provider} data-model-id={selection.model}
+    title={effort === undefined ? name : `${name} · ${effort}`}>
+    <span className={css.triggerLabel}>{group === undefined || model === undefined ? name : renderModelLabel(props, {
+      id: group.id, name: group.id === 'deepseek-account' ? props.t('provider.account') : group.name,
+    }, model, 'trigger', true)}</span>
+    {effort !== undefined && <span className={css.triggerEffort}>{effort}</span>}
+  </span>
+}
+
+function EditableModelSelect(props: ModelSeatProps & { state: ModelDirectoryState }) {
+  const { locked, state, load, select, t, renderSlot } = props
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState<Pane>('root')
   const [query, setQuery] = useState('')
@@ -206,15 +251,13 @@ export function ModelSelect(
     const viewport = groupsRef.current
     if (viewport === null) return
     return observeStickyMenuGroups(viewport)
-  }, [available, open, pane, filteredGroups])
+  }, [open, pane, filteredGroups])
 
   useLayoutEffect(() => {
     if (open && pane === 'model' && activeModelIndex >= 0) {
       itemRefs.current[activeModelIndex]?.scrollIntoView({ block: 'nearest' })
     }
   }, [open, pane, activeModelIndex, visibleModels])
-
-  if (!available) return null
 
   const show = (): void => {
     setSelectionFocus(false)
@@ -405,24 +448,6 @@ export function ModelSelect(
       : effortLabel === undefined
         ? t('trigger.aria', { model: modelLabel })
         : t('trigger.ariaEffort', { model: modelLabel, effort: effortLabel })
-  const renderModelLabel = (
-    provider: ModelLabelOwner['provider'], model: ModelLabelOwner['model'],
-    placement: ModelLabelOwner['placement'], selected: boolean,
-  ) => (
-    <span data-provider-id={provider.id} data-model-id={model.id}>
-      {renderSlot('conversation.input.model.label', {
-        provider, model, placement, selected,
-      }, {
-        fallback: model.badge === undefined ? model.name : (
-          <span className={css.badgedName}>
-            {placement === 'trigger' ? <><Tag className={css.badge} tone={model.badge.tone}>{resolveText(model.badge.text)}</Tag>{' '}</> : null}
-            <span className={css.badgedNameText}>{model.name}</span>
-            {placement === 'trigger' ? null : <>{' '}<Tag className={css.badge} tone={model.badge.tone}>{resolveText(model.badge.text)}</Tag></>}
-          </span>
-        ),
-      })}
-    </span>
-  )
   let itemIndex = 0
   let modelIndex = 0
   const itemRef = () => {
@@ -465,7 +490,7 @@ export function ModelSelect(
       >
         <IconDataOutlineRegular className={css.triggerIcon} size={16} />
         <span className={css.triggerLabel}>
-          {currentChoice === undefined ? modelLabel : renderModelLabel(currentChoice.group.provider, currentChoice.model, 'trigger', true)}
+          {currentChoice === undefined ? modelLabel : renderModelLabel(props, currentChoice.group.provider, currentChoice.model, 'trigger', true)}
         </span>
         {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
         {busy
@@ -491,7 +516,7 @@ export function ModelSelect(
               <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { drill('model') }}>
                 <span className={css.cellLabel}>{t('menu.model')}</span>
                 <span className={css.cellValue}>
-                  {currentChoice === undefined ? modelLabel : renderModelLabel(currentChoice.group.provider, currentChoice.model, 'menu', true)}
+                  {currentChoice === undefined ? modelLabel : renderModelLabel(props, currentChoice.group.provider, currentChoice.model, 'menu', true)}
                 </span>
                 <IconChevronRightOutlineRegular className={css.cellChevron} />
               </button>
@@ -596,7 +621,7 @@ export function ModelSelect(
                             onClick={() => { choose({ provider: group.id, model: model.id }) }}
                           >
                             <span className={css.optionCopy}>
-                              <span className={css.modelName}>{renderModelLabel(group.provider, model, 'option', selected)}</span>
+                              <span className={css.modelName}>{renderModelLabel(props, group.provider, model, 'option', selected)}</span>
                             </span>
                             <span className={css.check}>
                               {pending?.provider === group.id && pending.model === model.id

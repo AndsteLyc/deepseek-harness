@@ -482,19 +482,49 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 
-  it('renders no Agent-bound control for an addressed subagent session', () => {
+  it('shows the addressed child’s recorded model and effort with a read-only custom label', async () => {
+    const runtime = await SlotTestRuntime.create()
+    onTestFinished(() => runtime.dispose())
+    const id = await runtime.sessions.add({ id: 'child' })
+    const session = runtime.sessions.retainFor(runtime.ctx, id)
     const load = vi.fn()
-    render(<ModelSelect renderSlot={renderLabel}
-      locked={false}
-      available={false}
-      directory={createSnapshotStore(state())}
-      load={load} resolveText={resolveText}
-      select={vi.fn().mockResolvedValue(undefined)}
-      t={t}
-    />)
-
+    const select = vi.fn()
+    const directory = createSnapshotStore(state())
+    await runtime.root.declare({ 'conversation.input.model': { kind: 'single', scope: 'session' } },
+      ({ SessionProvider, renderSlot }) => <SessionProvider session={session}>
+        {renderSlot('conversation.input.model', { locked: false })}
+      </SessionProvider>)
+    await runtime.mount({ inject: ['slots'], apply(ctx) {
+      ctx.slots.inject('conversation.input.model', () => ctx.slots.register({
+        name: 'conversation.input.model',
+        children: {
+          'conversation.input.model.label': { kind: 'single', scope: 'session', inline: true },
+          'conversation.input.model.options': { kind: 'list', scope: 'session' },
+        },
+      }, props => <ModelSelect {...props} available={false} directory={directory} load={load}
+        select={select} resolveText={resolveText} t={t} />))
+      ctx.slots.inject('conversation.input.model.label', () => ctx.slots.register({ name: 'conversation.input.model.label' },
+        ({ provider, model, placement }) => <span>{`${placement}: ${provider.name} / ${model.name}`}</span>))
+    } })
+    runtime.renderRoot()
+    expect(document.querySelector('[data-model-id]')).toBeNull()
+    const record = (model: string, reasoningEffort?: string) => runtime.sessions.setProjection(id, 'subagent', {
+      mode: 'one-shot', seq: 0, modelSelection: { provider: 'deepseek-official', model, reasoningEffort },
+    })
+    await record('deepseek-v4-flash', 'max')
+    const caption = screen.getByTitle('DeepSeek-V4-Flash · Max')
+    expect(caption.textContent).toBe('trigger: DeepSeek / DeepSeek-V4-FlashMax')
+    fireEvent.click(caption)
+    expect(screen.queryByRole('menu')).toBeNull()
     expect(screen.queryByRole('button')).toBeNull()
+    await record('deepseek-v4-flash')
+    expect(screen.getByTitle('DeepSeek-V4-Flash').textContent).toBe('trigger: DeepSeek / DeepSeek-V4-Flash')
+    await record('retired', 'historic-effort')
+    expect(screen.getByTitle('retired · historic-effort').textContent).toBe('retiredhistoric-effort')
+    await runtime.sessions.setProjection(id, 'subagent', null)
+    expect(document.querySelector('[data-model-id]')).toBeNull()
     expect(load).not.toHaveBeenCalled()
+    expect(select).not.toHaveBeenCalled()
   })
 })
 

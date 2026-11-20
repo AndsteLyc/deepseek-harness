@@ -542,7 +542,7 @@ describe('ui-model-selection dual entry', () => {
     expect(() => b.seat().inject!(sid('ghost'))).toThrow(/resolved no scope/)
   })
 
-  it('withholds both model entries from addressed subagent sessions without Agent-bound RPCs', async () => {
+  it('withholds both model switching paths from addressed subagent sessions without Agent-bound RPCs', async () => {
     const b = await bench()
     b.mint('child')
     b.address(sid('child'))

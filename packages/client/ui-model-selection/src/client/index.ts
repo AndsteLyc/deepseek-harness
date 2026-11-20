@@ -6,9 +6,9 @@
  * durable model-selection projection, and submit through `session.selectModel`.
  * A switch made in either entry is what the other shows next. Failures
  * ride each entry's own retry surface (popup shell error/retry; seat menu
- * inline error) without forking the state. Addressed subagent sessions expose
- * neither entry because those Agent-bound RPCs would activate persisted
- * history outside the direct-parent continuation path.
+ * inline error) without forking the state. Addressed subagent sessions show a
+ * read-only caption. Agent-bound RPCs would activate persisted history
+ * outside the direct-parent continuation path.
  */
 // Type-only: the carrier types, the forwarded Host-event face and the ctx.remote merge.
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'

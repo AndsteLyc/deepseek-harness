@@ -4,6 +4,7 @@
  * @module @deepseek-ai/dsh-subagent/projection-types
  */
 
+import type { ModelSelection } from '@deepseek-ai/dsh-agent/types'
 import type { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 
 /** Known child modes with their creation labels and names, shared by catalog views. */
@@ -66,7 +67,10 @@ export interface SubagentTimingProjection {
  * Label strength follows the descriptor schema: a continuable child always
  * carries one, a one-shot child may omit it.
  */
-export type SubagentIdentityProjection =
+export type SubagentIdentityProjection = {
+  /** Latest own request route and resolved effort, initially the complete route declared by the child's descriptor. */
+  readonly modelSelection?: ModelSelection
+} & (
   | {
     /** A terminal one-shot child. */
     mode: 'one-shot'
@@ -88,6 +92,7 @@ export type SubagentIdentityProjection =
     /** Seq of the folded descriptor event; see the one-shot arm for the own-suffix proof. */
     seq: SessionSeq
   }
+)
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {

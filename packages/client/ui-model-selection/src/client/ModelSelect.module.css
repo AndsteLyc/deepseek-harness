@@ -6,8 +6,8 @@
 /* Figma 313:14108 ToggleButton: 13/20 regular secondary label, 4px gap,
    12px caption chevron; 28px chip height matches the sibling Plan /
    Read-only selects in the same tool row. */
-.trigger {
-  anchor-name: var(--dsh-model-anchor);
+.trigger,
+.readOnly {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -28,7 +28,16 @@
   font-size: 13px;
   line-height: 20px;
   font-weight: 400;
+}
+
+.trigger {
+  anchor-name: var(--dsh-model-anchor);
   cursor: pointer;
+}
+
+.readOnly {
+  /* A static caption has no icon-only menu for revealing its values. */
+  --dsh-composer-model-text-display: block;
 }
 
 @media (hover: hover) {

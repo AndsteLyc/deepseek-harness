@@ -1,7 +1,8 @@
 import { mountWorkingDirectoryFixture } from './working-directory-fixture.ts'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore from '@deepseek-ai/dsh-session'
+import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm/brand'
 import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '../src/index.ts'
@@ -28,14 +29,45 @@ function fold(events: SessionEvent[]) {
   return subagentTimingProjectionDefinition.wire.view(state)
 }
 
+const sessionHeader = { id: SessionId('child'), version: SESSION_FORMAT_VERSION, createdAt: 0, isSeeded: true } as const
+
 describe('subagent timing projection', () => {
   it('preserves historical one-shot identity without inventing a label', () => {
     const descriptor = {
       ...event('subagent/descriptor', 1, 110),
       data: { version: SUBAGENT_DESCRIPTOR_VERSION, mode: 'one-shot', provider: 'spawn' },
     } as SessionEvent
-    const state = subagentIdentityProjectionDefinition.apply(subagentIdentityProjectionDefinition.init(), descriptor)
+    const unit = subagentIdentityProjectionDefinition
+    const state = unit.apply(unit.init(sessionHeader, SessionLogOffset(0)), descriptor)
     expect(subagentIdentityProjectionDefinition.wire.view(state)).toEqual({ mode: 'one-shot', seq: 1 })
+  })
+
+  it('projects only the child route and the effort its own request materialized', () => {
+    const unit = subagentIdentityProjectionDefinition
+    const descriptor = (seq: number, model: string): SessionEvent<'subagent/descriptor'> => ({
+      type: 'subagent/descriptor', seq: SessionSeq(seq), time: seq,
+      data: {
+        version: SUBAGENT_DESCRIPTOR_VERSION, mode: 'continuable', label: model, provider: 'spawn',
+        agentProvider: 'p', agentModel: model, agentReasoningEffort: ReasoningEffortId('low'),
+      },
+    })
+    const request = (seq: number, model: string, effort?: string): SessionEvent<'request/header'> => ({
+      type: 'request/header', seq: SessionSeq(seq), time: seq,
+      data: { reason: 'change', header: {
+        config: { provider: 'p', model, ...effort === undefined ? {} : { reasoningEffort: ReasoningEffortId(effort) } },
+        ...effort === undefined ? {} : { adapterDefaults: { reasoningEffort: true } },
+      } },
+    })
+    const inherited = unit.apply(unit.init(sessionHeader, SessionLogOffset(2)), descriptor(0, 'ancestor'))
+    expect(unit.apply(inherited, request(1, 'ancestor', 'max'))).toBe(inherited)
+    expect(unit.wire.view(inherited)?.modelSelection).toBeUndefined()
+    const child = unit.apply(inherited, descriptor(2, 'declared'))
+    expect(unit.wire.view(child)?.modelSelection).toEqual({ provider: 'p', model: 'declared', reasoningEffort: 'low' })
+    const used = unit.apply(child, request(3, 'actual', 'high'))
+    expect(unit.wire.view(used)?.modelSelection).toEqual({ provider: 'p', model: 'actual', reasoningEffort: 'high' })
+    expect(unit.apply(used, request(4, 'actual', 'high'))).toBe(used)
+    const restored = unit.stateSchema.parse(JSON.parse(JSON.stringify(used)))
+    expect(unit.wire.view(unit.apply(restored, request(5, 'historical')))?.modelSelection).toEqual({ provider: 'p', model: 'historical' })
   })
 
   it('waits for the session projection registry and releases its projections on unload', async () => {

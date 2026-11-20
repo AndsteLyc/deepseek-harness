@@ -692,6 +692,12 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
       () => page.getByText(/^Explain event sourcing in one sentence\./).count(),
       { timeout: 15_000 },
     ).toBe(1)
+    const header = (await readPersistedEvents(scaffold, childId)).findLast(event => event.type === 'request/header')
+    if (!header) throw new Error('completed child has no recorded request')
+    const caption = page.locator('span[title][data-model-id][data-provider-id]:visible')
+    await caption.waitFor()
+    expect(await caption.getAttribute('data-model-id')).toBe(header.data.header.config.model)
+    expect(await caption.getAttribute('data-provider-id')).toBe(header.data.header.config.provider)
     if (scaffold.ctx.agents.get(childId) !== undefined) {
       throw new Error(`viewing the child activated it; API calls: ${apiCalls.join(', ')}`)
     }
