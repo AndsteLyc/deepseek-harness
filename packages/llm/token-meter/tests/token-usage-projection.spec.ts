@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
-import SessionStore from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
@@ -101,6 +101,37 @@ function appendSummaryMeter(ctx: Context, session: Session, start: SessionSeq, e
 }
 
 describe('tokenUsage session projection', () => {
+  it('counts only owned settlements after nested forks and cold checkpoint recovery', async () => {
+    const { ctx, session } = await harness()
+    try {
+      startStep(session, 1, 1)
+      finalUsage(session, { inputTokens: 100, outputTokens: 10 }, 1, 1)
+      const child = ctx.sessions.fork(session)
+      expect(ctx.sessionProjections.snapshot(child).values.ownedTokenUsage).toEqual(ZERO)
+      startStep(child, 2, 1)
+      usageChunk(child, { inputTokens: 20, outputTokens: 2 }, 2, 1)
+      const checkpoint = ctx.sessionProjections.checkpoint(child)
+      const cut = child.seq
+      finalUsage(child, { inputTokens: 23, outputTokens: 3 }, 2, 1)
+      const grandchild = ctx.sessions.fork(child)
+      expect(ctx.sessionProjections.snapshot(grandchild).values.ownedTokenUsage).toEqual(ZERO)
+      expect(projected(ctx, grandchild)).toEqual({ ...ZERO, uncachedInputTokens: 123, outputTokens: 13 })
+      const expected = { ...ZERO, uncachedInputTokens: 23, outputTokens: 3 }
+      expect(ctx.sessionProjections.snapshot(child).values.ownedTokenUsage).toEqual(expected)
+      expect(ctx.sessionProjections.restore(
+        checkpoint, child.snapshotEvents(cut), cut, child.header, child.inheritedEventCount,
+      ).snapshot.values.ownedTokenUsage).toEqual(expected)
+      const { ownedTokenUsage: _missing, ...legacy } = checkpoint
+      expect(ctx.sessionProjections.viewCheckpoint(legacy).ownedTokenUsage).toBeUndefined()
+      expect(ctx.sessionProjections.restoreFloor(legacy)).toBe(0)
+      expect(ctx.sessionProjections.restore(
+        legacy, child.snapshotEvents(), SessionLogOffset(0), child.header, child.inheritedEventCount,
+      ).snapshot.values.ownedTokenUsage).toEqual(expected)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('serves zero buckets without usage samples', async () => {
     const { ctx, session } = await harness()
     expect(projected(ctx, session)).toEqual(ZERO)

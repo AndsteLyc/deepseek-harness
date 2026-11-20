@@ -8,8 +8,12 @@ import type {
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
-import { ActivityPill, UsagePill, deriveStats, formatDuration, type StatPillProps } from '../src/client/chat/StatsPills.tsx'
+import { ActivityPill, UsagePill, deriveStats, formatDuration } from '../src/client/chat/StatsPills.tsx'
+import { ROOT, sessionList, singleSession, type StatPillProps } from './usage-session-fixture.client.ts'
 import { formatTokens } from '../src/client/chat/token-format.ts'
 import { en, zh } from '../src/client/locale.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
@@ -156,9 +160,12 @@ describe('composer stats pills', () => {
 
   function props(
     source: { getSnapshot(): ChatSnapshot; subscribe(fn: () => void): () => void },
-    values: Record<string, unknown> = { tokenUsage: USAGE },
+    values: Record<string, unknown> & { ownedTokenUsage?: TokenUsageProjection } = { ownedTokenUsage: USAGE },
   ): StatPillProps {
-    return { usePerformanceUsage: selector => selector('detailed'), useChat: bindSnapshotSelector(source), useProjection: projections(values), t: tEn }
+    return {
+      ...singleSession(values.ownedTokenUsage), t: tEn, usePerformanceUsage: selector => selector('detailed'),
+      useChat: bindSnapshotSelector(source), useProjection: projections(values),
+    }
   }
 
   function tokenUsage(cacheReadTokens: number, uncachedInputTokens: number) {
@@ -206,7 +213,7 @@ describe('composer stats pills', () => {
     expect(usagePill[0]!.getAttribute('aria-label')).toBe('105 tok · Cache hit 90%')
     const empty = makeSource()
     const emptyView = render(<StatsPills {...props(empty.source, {
-      tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      ownedTokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       contextPressure: {},
     })} />)
     expect(emptyView.container.textContent).toBe('')
@@ -231,7 +238,7 @@ describe('composer stats pills', () => {
     { actual: '100%', tokenUsageValue: tokenUsage(10_000, 0), expected: 'Cache hit 100%' },
   ])('formats an actual $actual cache-hit ratio as $expected', ({ tokenUsageValue, expected }) => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
-    const view = render(<StatsPills {...props(source, { tokenUsage: tokenUsageValue })} />)
+    const view = render(<StatsPills {...props(source, { ownedTokenUsage: tokenUsageValue })} />)
     expect(view.getAllByRole('button')[0]!.textContent).toContain(expected)
   })
 
@@ -304,6 +311,66 @@ describe('composer stats pills', () => {
     expect(dialog.textContent).not.toContain('LLM time')
   })
 
+  it('updates the open dialog on descendant billing and scopes a child view to its own subtree', () => {
+    const { source } = makeSource({ nodes: [timedStep()] })
+    const child = 'usage-child' as SessionId
+    const grandchild = 'usage-grandchild' as SessionId
+    const entries = [
+      { id: ROOT, usage: USAGE },
+      { id: child, parentId: ROOT, usage: { uncachedInputTokens: 200, cacheReadTokens: 0, cacheWriteTokens: 100, outputTokens: 25 } },
+    ]
+    const store = createSnapshotStore(sessionList(entries))
+    const common = { ...props(source), useSessions: bindSnapshotSelector(store) }
+    const view = render(<StatsPills {...common} />)
+    expect(view.getByRole('button', { name: '1 turns 1 steps · 20 tok/s' })).toBeTruthy()
+    fireEvent.click(view.getByRole('button', { name: '430 tok · Cache hit 23%' }))
+    const dialog = view.getByRole('dialog', { name: 'Token usage' })
+    expect(dialog.textContent).toContain('Current session105 tokSubagents325 tok')
+    expect(dialog.textContent).toContain('Uncached input210 tokCached input90 tokCache write100 tokOutput30 tok')
+
+    act(() => store.set(sessionList([...entries, { id: grandchild, parentId: child, usage: USAGE }])))
+    expect(dialog.firstChild?.textContent).toBe('Token usage535 tok')
+    expect(dialog.textContent).toContain('Current session105 tokSubagents430 tok')
+    expect(view.getByRole('button', { name: '535 tok · Cache hit 36%' })).toBeTruthy()
+
+    view.rerender(<StatsPills {...common} sessionId={child} />)
+    expect(view.getByRole('button', { name: '430 tok · Cache hit 23%' })).toBeTruthy()
+    expect(dialog.textContent).toContain('Current session325 tokSubagents105 tok')
+    view.rerender(<StatsPills {...common} sessionId={child} usePerformanceUsage={selector => selector('compact')} />)
+    expect(view.getByText('Cache hit 23%').closest('button')).toBeNull()
+  })
+
+  it('loads missing descendants serially and keeps the verified session count visible on failure', () => {
+    const child = 'cold-child' as SessionId
+    const sibling = 'cold-sibling' as SessionId
+    const entries = [{ id: ROOT, usage: USAGE }, { id: child, parentId: ROOT }, { id: sibling, parentId: ROOT }]
+    const list = sessionList(entries)
+    const store = createSnapshotStore(list)
+    const refreshUsage = vi.fn()
+    const { source } = makeSource()
+    const view = render(<StatsPills {...props(source)} useSessions={bindSnapshotSelector(store)} refreshUsage={refreshUsage} />)
+    expect(refreshUsage.mock.calls).toEqual([[child]])
+    expect(view.container.textContent).toContain('Calculating total…·Current session: 105 tok')
+    act(() => store.set({ ...list, projectionsBySession: {
+      ...list.projectionsBySession, [child]: { state: 'loading', values: {}, error: null },
+    } }))
+    expect(refreshUsage.mock.calls).toEqual([[child]])
+    const resolved = sessionList([...entries.slice(0, 1), { id: child, parentId: ROOT, usage: USAGE }, { id: sibling, parentId: ROOT }])
+    act(() => store.set(resolved))
+    expect(refreshUsage.mock.calls).toEqual([[child], [sibling]])
+    act(() => store.set({ ...resolved, projectionsBySession: {
+      ...resolved.projectionsBySession, [sibling]: { state: 'migration-required', values: {}, error: null },
+    } }))
+    expect(view.container.textContent).toBe('Total usage unavailable·Current session: 105 tok')
+    expect(view.queryByRole('button')).toBeNull()
+    expect(refreshUsage.mock.calls).toEqual([[child], [sibling]])
+    const missing = sessionList([{ id: ROOT }])
+    act(() => store.set({ ...missing, projectionsBySession: {
+      [ROOT]: { state: 'ready', values: {}, error: null },
+    } }))
+    expect(view.container.textContent).toBe('Total usage unavailable')
+  })
+
   it('closes the dialog on Escape or an outside pointerdown', () => {
     const { source } = makeSource({ nodes: [timedStep()] })
     const view = render(<StatsPills {...props(source)} />)
@@ -357,7 +424,7 @@ describe('composer stats pills', () => {
 
   it('takes every pill and dialog label from the active locale', () => {
     const { source } = makeSource({ nodes: [timedStep()] })
-    const view = render(<StatsPills {...props(source, { tokenUsage: tokenUsage(9_995, 5) })} t={t} />)
+    const view = render(<StatsPills {...props(source, { ownedTokenUsage: tokenUsage(9_995, 5) })} t={t} />)
     const [timePill, usagePill] = [...view.getAllByRole('button')] as [HTMLElement, HTMLElement]
     expect(timePill.textContent).toBe('1 轮 1 步·20 tok/s')
     // Whole-log total 9995 + 5 + 1 compacts to 10K.
@@ -425,7 +492,7 @@ describe('composer stats pills', () => {
   it('keeps the durable usage pill after the visible step window is empty', () => {
     const { source } = makeSource()
     const view = render(<StatsPills {...props(source, {
-      tokenUsage: USAGE,
+      ownedTokenUsage: USAGE,
       contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 },
     })} />)
     // Context occupancy lives on the composer's ContextMeter ring, not here.
@@ -447,7 +514,7 @@ describe('composer stats pills', () => {
     // counter — the durable projection's totals win over the window fold.
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsPills {...props(source, {
-      tokenUsage: USAGE,
+      ownedTokenUsage: USAGE,
       sessionStats: sessionStats({ turns: 10, steps: 89 }),
     })} />)
     expect(view.getByText('10 turns 89 steps')).toBeTruthy()
@@ -458,7 +525,7 @@ describe('composer stats pills', () => {
     // closed step in the whole log, so nothing renders on a brand-new session.
     const empty = makeSource()
     const view = render(<StatsPills {...props(empty.source, {
-      tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      ownedTokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       sessionStats: sessionStats({}),
     })} />)
     expect(view.container.textContent).toBe('')
@@ -469,7 +536,7 @@ describe('composer stats pills', () => {
     // the counts pill renders alone, not an uninformative zero-token pill.
     const { source } = makeSource()
     const view = render(<StatsPills {...props(source, {
-      tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      ownedTokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       sessionStats: sessionStats({ turns: 1, steps: 1 }),
     })} />)
     expect(view.container.textContent).toBe('1 turns 1 steps')
@@ -481,7 +548,7 @@ describe('composer stats pills', () => {
     // window that compaction (or paging) left without assistant nodes.
     const { source } = makeSource()
     const view = render(<StatsPills {...props(source, {
-      tokenUsage: USAGE,
+      ownedTokenUsage: USAGE,
       sessionStats: sessionStats({ turns: 7, steps: 44 }),
     })} />)
     expect(view.getByText('7 turns 44 steps')).toBeTruthy()
@@ -493,7 +560,7 @@ describe('composer stats pills', () => {
     // either. An untimed 1-node window renders the projection's whole-log figures.
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsPills {...props(source, {
-      tokenUsage: USAGE,
+      ownedTokenUsage: USAGE,
       sessionStats: sessionStats({
         turns: 200, steps: 200, llmMs: 100_000, toolMs: 62_000,
         ttftMs: 1_600, ttftSteps: 2, decodeMs: 3_000, decodeTokens: 60,
@@ -512,7 +579,7 @@ describe('composer stats pills', () => {
   it('omits the cache-hit segment when nothing was billed on the input side', () => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsPills {...props(source, {
-      tokenUsage: { uncachedInputTokens: 0, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      ownedTokenUsage: { uncachedInputTokens: 0, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 },
     })} />)
     const usagePill = view.getAllByRole('button')[0]!
     expect(usagePill.textContent).toBe('7 tok')
@@ -525,7 +592,7 @@ describe('composer stats pills', () => {
   it('includes cache writes in the total and the cache-hit denominator', () => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsPills {...props(source, {
-      tokenUsage: {
+      ownedTokenUsage: {
         uncachedInputTokens: 10,
         outputTokens: 7,
         cacheReadTokens: 90,

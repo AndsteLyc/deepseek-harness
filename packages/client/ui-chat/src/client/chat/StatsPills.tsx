@@ -4,14 +4,14 @@
 // token totals, and click-open dialogs. Settled-node identity prevents
 // stream-delta updates from rerendering the pills.
 
-import { memo, useMemo, type ReactNode } from 'react'
+import { memo, useEffect, useMemo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { IconDatabaseOutlineRegular, IconGaugeOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { InjectFace, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: merges the sessionStats key into SessionProjectionMap for useProjection.
 import type {} from '@deepseek-ai/dsh-session-stats/client'
-import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
+import { deriveTreeTokenUsage, type TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import type { ChatViewSlotProps, PerformanceUsageInjected } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { formatTokensPerSecond } from './message-chrome.ts'
@@ -43,7 +43,7 @@ interface WindowStats {
  * the FALLBACK for assemblies without the `sessionStats` projection.
  *
  * Every displayed figure rides that durable whole-log projection (and token
- * accounting rides `tokenUsage`) because the window is paged and compaction
+ * accounting uses session-owned token projections) because the window is paged and compaction
  * rewrites it; this fold answers "what is on screen" only when no projection
  * value is served. Its field names deliberately mirror the projection's so
  * the two swap wholesale.
@@ -99,8 +99,8 @@ export function formatDuration(ms: number, t: ChatViewSlotProps['t']): string {
 }
 
 /**
- * Display-ready cache-hit share of prompt-side input over the whole durable log.
- * @param usage - the session's token-usage projection value.
+ * Display-ready cache-hit share across the combined prompt-side buckets.
+ * @param usage - token totals for the displayed subtree.
  * @returns integer text when integer rounding stays below 100, otherwise the
  * minimum decimal precision that still rounds below 100; a full hit returns
  * 100, and no billed input returns null.
@@ -112,22 +112,31 @@ export function cacheHitPercent(usage: TokenUsageProjection): string | null {
 
 /**
  * Sum the three disjoint prompt-side billing buckets.
- * @param usage - the session's token-usage projection value.
+ * @param usage - the displayed token buckets.
  * @returns billed input tokens.
  */
 export function billedInputTokens(usage: TokenUsageProjection): number {
   return usage.uncachedInputTokens + usage.cacheReadTokens + usage.cacheWriteTokens
 }
 
+function billedTokens(usage: TokenUsageProjection): number {
+  return billedInputTokens(usage) + usage.outputTokens
+}
+
 type Translate = ChatViewSlotProps['t']
 
-/** Props shared by every composer stats pill: the conversation-snapshot selector plus the projection read seat. */
-export interface StatPillProps extends InjectFace<PerformanceUsageInjected> {
-  useChat: SnapshotSelectorHook<ChatSnapshot>
-  useProjection: UseProjection
-  /** The owning dock's locale seat. */
-  t: Translate
-}
+type DockProps = PropsRuntime<'conversation.composer.dock'>
+
+/** Composer activity reads its bound Session's settled counts and timings. */
+export type ActivityPillProps = InjectFace<PerformanceUsageInjected>
+  & Pick<DockProps, 'useChat' | 'useProjection'> & { t: Translate }
+
+/** Billing follows the displayed Session and its local subagents. */
+export type UsagePillProps = InjectFace<PerformanceUsageInjected>
+  & Pick<DockProps, 'sessionId' | 'useSessions'> & {
+    t: Translate
+    refreshUsage: (sessionId: DockProps['sessionId']) => void
+  }
 
 /** Dock entry id carried as `data-composer-stat` on each pill. */
 type StatId = 'activity' | 'usage'
@@ -163,7 +172,7 @@ function reading(first: string, second: string | null): Pick<PillContent, 'label
 // compaction cannot change any of them; an assembly without the unit falls
 // back to the window-scoped fold wholesale (same field names), paid only
 // while no projection value is served.
-function useSessionStats(useChat: StatPillProps['useChat'], useProjection: UseProjection): WindowStats {
+function useSessionStats(useChat: ActivityPillProps['useChat'], useProjection: UseProjection): WindowStats {
   const settledNodes = useChat(s => s.legacy.nodes)
   const projected = useProjection('sessionStats')
   return useMemo(() => projected ?? deriveStats(settledNodes), [projected, settledNodes])
@@ -248,7 +257,7 @@ function DialogPill({ stat, icon, label, text, title, titleValue, children }: Pi
  * Turn and step counts with whole-session speed, opening the time and speed
  * dialog; Compact keeps only the speed reading.
  */
-export const ActivityPill = memo(function ActivityPill({ useChat, useProjection, usePerformanceUsage, t }: StatPillProps) {
+export const ActivityPill = memo(function ActivityPill({ useChat, useProjection, usePerformanceUsage, t }: ActivityPillProps) {
   const mode = usePerformanceUsage(value => value)
   const stats = useSessionStats(useChat, useProjection)
   const speed = stats.decodeMs > 0 ? decodeSpeed(stats, t) : null
@@ -293,21 +302,32 @@ export const ActivityPill = memo(function ActivityPill({ useChat, useProjection,
   )
 })
 
-/** Whole-log token total and cache hit; Compact keeps only the cache hit. */
-export const UsagePill = memo(function UsagePill({ useProjection, usePerformanceUsage, t }: StatPillProps) {
+/** The compact and detailed readings share the same subtree billing totals. */
+export const UsagePill = memo(function UsagePill({ sessionId, useSessions, refreshUsage, usePerformanceUsage, t }: UsagePillProps) {
   const mode = usePerformanceUsage(value => value)
-  const usage = useProjection('tokenUsage')
-  // Gated on actual token activity: a session whose steps all settled without
-  // billing (e.g. every request failed) shows no usage pill.
-  if (usage === undefined || (billedInputTokens(usage) === 0 && usage.outputTokens === 0)) return null
+  const sessions = useSessions(state => state)
+  const tree = useMemo(() => deriveTreeTokenUsage(sessionId, sessions), [sessionId, sessions])
+  const { nextRead } = tree
+  useEffect(() => {
+    if (nextRead !== undefined) refreshUsage(nextRead)
+  }, [nextRead, refreshUsage])
+  const icon = <IconDatabaseOutlineRegular />
+  if (tree.total === undefined) {
+    if (!tree.unavailable && tree.currentSession === undefined) return null
+    const status = tree.unavailable ? t('stats.usageUnavailable') : t('stats.usageLoading')
+    const current = tree.currentSession === undefined ? null : t('stats.currentUsage', {
+      count: exactCount(billedTokens(tree.currentSession), t),
+    })
+    return <PlainPill stat="usage" icon={icon} {...reading(status, current)} />
+  }
+  const usage = tree.total
+  const total = billedTokens(usage)
+  if (total === 0) return null
   const cacheHit = cacheHitPercent(usage)
   const cacheHitText = cacheHit !== null ? t('stats.cacheHit', { percent: cacheHit }) : null
-  const icon = <IconDatabaseOutlineRegular />
   if (mode === 'compact') {
     return cacheHitText === null ? null : <PlainPill stat="usage" icon={icon} {...reading(cacheHitText, null)} />
   }
-  // Same aggregate as the Turn pill's totalTokens: every prompt-side billing bucket plus output.
-  const total = billedInputTokens(usage) + usage.outputTokens
   const totalText = t('message.turnUsage.count', { count: formatTokens(total, t) })
   return (
     <DialogPill
@@ -317,6 +337,12 @@ export const UsagePill = memo(function UsagePill({ useProjection, usePerformance
       title={t('stats.dialog.usageTitle')}
       titleValue={exactCount(total, t)}
     >
+      <dl className={dialogCss.details}>
+        <dt>{t('stats.dialog.currentSession')}</dt>
+        <dd>{exactCount(billedTokens(tree.currentSession), t)}</dd>
+        <dt>{t('stats.dialog.subagents')}</dt>
+        <dd>{exactCount(billedTokens(tree.subagents), t)}</dd>
+      </dl>
       {/* jscpd:ignore-start -- the session-total bucket rows deliberately mirror
           TurnUsagePanel's per-turn dl: same skin, different data contract (the
           buckets are always present here; per-turn fields are optional). A

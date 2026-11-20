@@ -222,7 +222,8 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     scaffold.ctx.sessionProjectionCache.coldSnapshot(oneShotHeader, SessionLogOffset(0), oneShotEvents)
     await waitForCacheRow(scaffold, oneShotHeader)
     await page.getByRole('button', { name: '1 subagent', exact: true }).waitFor({ timeout: 15_000 })
-    const catalogReads = apiCalls.filter(path => path === '/api/session/projections').length
+    // The new child can fetch its usage once. The parent's pushed catalog needs no read.
+    const projectionReads = vi.spyOn(scaffold.ctx.sessionController, 'projections')
     parent.session.append('subagent/catalog', {
       version: 0,
       childId: oneShotId,
@@ -232,7 +233,8 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     })
     const pushedCount = page.getByRole('button', { name: '2 subagents', exact: true })
     await pushedCount.waitFor({ timeout: 15_000 })
-    expect(apiCalls.filter(path => path === '/api/session/projections')).toHaveLength(catalogReads)
+    expect(projectionReads.mock.calls.map(([request]) => request.sessionId).filter(id => id !== oneShotId)).toEqual([])
+    projectionReads.mockRestore()
     await compareOrRefreshGolden(CATALOG_PUSH_EXPECTED, await pushedCount.ariaSnapshot(), MODE)
     grandchildId = sessionId('recorded-grandchild')
     const authoredAt = Date.now()
@@ -363,6 +365,22 @@ describe('web e2e: persisted subagent conversation and human continuation', () =
     hostClock?.mockRestore()
     if (failures.length === 1) throw failures[0]
     if (failures.length > 1) throw new AggregateError(failures, 'subagent Web teardown failed')
+  })
+
+  it('includes completed subagent usage in the parent composer after reload', async () => {
+    const pill = page.locator('[data-composer-stat="usage"] button')
+    await pill.click()
+    const dialog = page.getByRole('dialog', { name: 'Token usage' })
+    try {
+      await dialog.getByText('Subagents', { exact: true }).waitFor()
+      const childTokens = dialog.getByText('Subagents', { exact: true }).locator('xpath=following-sibling::dd[1]')
+      await expect.poll(() => childTokens.textContent()).toBe('7,869 tok')
+      const expected = fileURLToPath(new URL('../../../snapshots/web/subagent-conversation/composer-usage.expected.md', import.meta.url))
+      await compareOrRefreshGolden(expected, await dialog.ariaSnapshot(), MODE)
+      expect(scaffold.ctx.agents.get(childId)).toBeUndefined()
+    } finally {
+      await page.keyboard.press('Escape')
+    }
   })
 
   it('retries a failed cold catalog and discovers descendants without reopening the menu', async () => {
@@ -1093,7 +1111,8 @@ describe('web e2e: migration-required subagent catalog', () => {
       }
       const before = await captureStableAria(page, '[role="tree"][aria-label="Subagent sessions"]', scaffold.workspaceCwd)
       expect(observe.mock.calls.some(([id]) => id === childId || id === grandchildId)).toBe(false)
-      expect(projections).not.toHaveBeenCalled()
+      expect(projections.mock.calls.every(([request]) => request.sessionId === parentId)).toBe(true)
+      projections.mockClear()
 
       await childRow.getByText(childId, { exact: true }).click()
       await page.getByRole('button', { name: `Switch subagent: ${childLabel}`, exact: true }).waitFor()

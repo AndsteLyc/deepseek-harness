@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { lastAssistantStreamChunk, type TokenUsage } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-llm-retry/types'
 import { SessionSeq } from '@deepseek-ai/dsh-session'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SessionEvent, SessionHeader, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { ContextPressureProjection, TokenUsageProjection } from './projection.ts'
 import { foldSurfaceProjection } from './surface-projection.ts'
@@ -142,6 +142,27 @@ export const tokenUsageProjectionDefinition = {
   },
   wire: { viewSchema: projectionSchema, view: state => state.totals },
 } satisfies ProjectionDefinition<'tokenUsage', TokenUsageState>
+
+const ownedUsageStateSchema = z.object({
+  inheritedEventCount: z.number().int().nonnegative(),
+  usage: tokenUsageStateSchema,
+}).strict()
+
+/** Counts only settlements owned by the Session, including its persisted history after a fork. */
+export const ownedTokenUsageProjectionDefinition = {
+  key: 'ownedTokenUsage',
+  stateVersion: 1,
+  stateSchema: ownedUsageStateSchema,
+  init: (_header: SessionHeader, inheritedEventCount: SessionLogOffset) => ({
+    inheritedEventCount, usage: tokenUsageProjectionDefinition.init(),
+  }),
+  apply: (state, event) => {
+    if (event.seq < state.inheritedEventCount) return state
+    const usage = tokenUsageProjectionDefinition.apply(state.usage, event)
+    return usage === state.usage ? state : { ...state, usage }
+  },
+  wire: { viewSchema: projectionSchema, view: state => state.usage.totals },
+} satisfies ProjectionDefinition<'ownedTokenUsage', z.infer<typeof ownedUsageStateSchema>>
 
 /**
  * Token-meter's context-occupancy projection unit.

@@ -9,7 +9,8 @@ import { useDetailedPresentation } from './presentation-fixture.client.ts'
 import { unusedImageLoader } from './reasoning-component-fixture.tsx'
 import { useDisclosure } from '../src/client/chat/use-disclosure.ts'
 import { useSearchableHidden } from '../src/client/chat/searchable-hidden.ts'
-import { ActivityPill, UsagePill, type StatPillProps } from '../src/client/chat/StatsPills.tsx'
+import { ActivityPill, UsagePill } from '../src/client/chat/StatsPills.tsx'
+import { singleSession, type StatPillProps } from './usage-session-fixture.client.ts'
 import { zh } from '../src/client/locale.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
@@ -39,7 +40,7 @@ describe('render branch tails', () => {
   it('composer stats fall back to window-node counts and drop the usage pill without projections', () => {
     // No sessionStats key → the window fold supplies the counts (the
     // assembly-without-the-unit fallback). Node `usage` is deliberately
-    // ignored: billing rides the durable tokenUsage projection, so an absent
+    // ignored: billing rides the durable usage projection, so an absent
     // projection leaves counts only.
     const nodes = [
       { kind: 'assistant', seq: 1, time: 1, turn: 1, step: 1, blocks: [] },
@@ -52,6 +53,7 @@ describe('render branch tails', () => {
       usePerformanceUsage: selector => selector('detailed'),
       t,
       useChat: bindSnapshotSelector(source),
+      ...singleSession(),
       useProjection: () => undefined,
     }
     const view = render(

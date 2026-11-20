@@ -1,0 +1,14 @@
+- dialog "Token usage":
+  - text: Token usage 15,738 tok
+  - term: Current session
+  - definition: 7,869 tok
+  - term: Subagents
+  - definition: 7,869 tok
+  - term: Cache hit
+  - definition: 99%
+  - term: Uncached input
+  - definition: 220 tok
+  - term: Cached input
+  - definition: 15,360 tok
+  - term: Output
+  - definition: 158 tok

@@ -345,7 +345,11 @@ export function apply(ctx: Context): void {
       name: 'conversation.composer.dock', id: 'activity', order: 0, locale: NS, inject: statPillInject,
     }, ActivityPill)
     yield ctx.slots.register({
-      name: 'conversation.composer.dock', id: 'usage', order: 1, locale: NS, inject: statPillInject,
+      name: 'conversation.composer.dock', id: 'usage', order: 1, locale: NS,
+      inject: () => ({
+        hooks: { performanceUsage },
+        refreshUsage: (id: SessionId) => { void ctx.sessions.refreshProjections(id) },
+      }),
     }, UsagePill)
   })
 

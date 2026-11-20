@@ -22,7 +22,8 @@ import { unusedImageLoader } from './reasoning-component-fixture.tsx'
 import { createUserContentFixture } from './user-content-component-fixture.tsx'
 import { useDisclosure } from '../src/client/chat/use-disclosure.ts'
 import { useSearchableHidden } from '../src/client/chat/searchable-hidden.ts'
-import { ActivityPill, UsagePill, type StatPillProps } from '../src/client/chat/StatsPills.tsx'
+import { ActivityPill, UsagePill } from '../src/client/chat/StatsPills.tsx'
+import { singleSession, type StatPillProps } from './usage-session-fixture.client.ts'
 import { zh } from '../src/client/locale.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
@@ -1107,9 +1108,8 @@ describe('small branch tails', () => {
       usePerformanceUsage: selector => selector('detailed'),
       t,
       useChat: bindSnapshotSelector(source),
-      useProjection: (key: string) => key === 'tokenUsage'
-        ? { uncachedInputTokens: 0, outputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0 }
-        : undefined,
+      ...singleSession({ uncachedInputTokens: 0, outputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0 }),
+      useProjection: () => undefined,
     }
     const view = render(
       <>

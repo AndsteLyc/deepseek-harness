@@ -82,6 +82,12 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+.details + .details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
+}
+
 .details dt,
 .details dd {
   min-width: 0;
