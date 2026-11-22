@@ -46,6 +46,8 @@ A settings surface registers into the slot types this package declares. The shel
 
 To customize a page's navigation icon, use `ctx.slots.inject('settings.section.icon', ...)` and register an icon component with the same `id` as its `settings.section` contribution. Unmatched ids never render, and the icon's `label` option is not displayed. The component receives `size` in pixels and `active`; the shell owns the button, label, and decorative icon wrapper. Without a matching icon registration, the shell renders its default glyph. Disposing the icon contribution restores that glyph.
 
+Add an action to the sidebar Settings launcher row with `ctx.slots.inject('settings.launcher.action', ...)`. The root-scoped list renders after the built-in connection and desktop update indicators, within the same row. Give each action a registration `id`. The component receives `wide` (whether the sidebar shows labels) and `openSettings(sectionId?)`, the same callback the launcher uses.
+
 ### Observable success and failures
 
 A committed write folds its answer into the shared mirror. Refused writes refresh the latest Host values. Browser validation uses the serialized Config schema; the Host validates complete configuration, including checks that cannot be serialized.

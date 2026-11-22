@@ -235,6 +235,7 @@ export function apply(ctx: ClientContext): void {
         store: shellStore,
         children: {
           'settings.launcher': { kind: 'single', scope: 'root' },
+          'settings.launcher.action': { kind: 'list', scope: 'root' },
           'settings.trigger': { kind: 'single', scope: 'root' },
           'settings.header': { kind: 'single', scope: 'root' },
           'settings.action': { kind: 'list', scope: 'root' },

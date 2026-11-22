@@ -46,6 +46,8 @@ kind: "package-reference"
 
 要自定义页面的导航图标，使用 `ctx.slots.inject('settings.section.icon', ...)`，并以与其 `settings.section` 贡献相同的 `id` 注册图标组件。不匹配的 id 不会渲染，图标的 `label` 选项不会显示。组件接收以像素为单位的 `size` 和 `active`；外壳负责按钮、标签和装饰性图标容器。没有匹配的图标注册时，外壳渲染默认图标。释放图标贡献后恢复该默认图标。
 
+使用 `ctx.slots.inject('settings.launcher.action', ...)` 在侧栏设置入口行添加操作。这个根作用域列表位于同一行的内置连接状态和桌面更新指示器之后。为每个操作指定注册 `id`。组件接收 `wide`（侧栏是否显示文字标签），以及与入口共用的 `openSettings(sectionId?)` 回调。
+
 ### 可观察的成功与失败
 
 已提交的写入将应答合入共享镜像。被拒绝的写入刷新最新 Host 值。浏览器使用序列化的 Config schema 校验；Host 校验完整配置，包括无法序列化的检查。

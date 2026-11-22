@@ -89,7 +89,19 @@
     ".agents/notes/archived/manifest.json",
     ".agents/notes/archived/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.i18n.yaml",
     ".agents/notes/archived/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md",
-    ".agents/notes/archived/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.zh.md"
+    ".agents/notes/archived/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.zh.md",
+    "packages/client/ui-settings-general/src/client/SettingsRoot.tsx",
+    "packages/client/ui-settings-general/src/client/index.ts",
+    "packages/client/ui-settings-general/src/client/shell-contract.ts",
+    "packages/client/ui-settings-general/tests/launcher-action.client.spec.tsx",
+    "packages/client/ui-settings-general/tests/settings-root.client.spec.tsx",
+    "packages/client/ui-settings-general/tests/shell.client.spec.ts",
+    "packages/client/ui-settings/README.i18n.yaml",
+    "packages/client/ui-settings/README.md",
+    "packages/client/ui-settings/README.zh.md",
+    "packages/client/ui-settings/src/client/contract/slots.ts",
+    "packages/client/ui-settings/src/client/index.ts",
+    "packages/extensions/cordis-client-runner/src/client/slot-catalog.ts"
   ],
   "upstreamTree": "6ec0fcdcaf38bdf8ffa6675e30b036dc104a1ece"
 }

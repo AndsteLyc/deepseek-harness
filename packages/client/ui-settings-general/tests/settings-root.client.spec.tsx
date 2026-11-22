@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { contextMenuHook } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ShortcutCatalogEntry, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import type { SettingsLauncherActionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, useState } from 'react'
@@ -57,6 +58,7 @@ function mount({
   dictionary = en,
   connectionState = 'connected',
   desktopUpdate = { failed: false, opening: false },
+  launcherAction = false,
   onboardingActive = true,
   mainView = true,
   rows = [
@@ -74,6 +76,7 @@ function mount({
   dictionary?: typeof en | typeof zh
   connectionState?: ConnectionSnapshot
   desktopUpdate?: DesktopUpdateView
+  launcherAction?: boolean
   onboardingActive?: boolean
   mainView?: boolean
   rows?: Row[]
@@ -87,8 +90,14 @@ function mount({
   const connectionListeners = new Set<() => void>()
   const reconnect = vi.fn()
   const renderSlot = vi.fn(
-    ((key: string, _owner: unknown, opts?: { only?: string; fallback?: import('react').ReactNode }) => {
+    ((key: string, owner: unknown, opts?: { only?: string; fallback?: import('react').ReactNode }) => {
       if (key === 'settings.section') return <div data-testid={`section-${opts?.only ?? 'all'}`} />
+      if (key === 'settings.launcher.action' && launcherAction) {
+        const { wide, openSettings } = owner as SettingsLauncherActionOwnerProps
+        return <button type="button" onClick={() => { openSettings(wide ? 'models' : undefined) }}>
+          {wide ? 'Open models' : 'Open default section'}
+        </button>
+      }
       return SEAT_CONTENT[key] ?? opts?.fallback
     }) as SettingsRootComponentProps['renderSlot'],
   )
@@ -185,14 +194,26 @@ function openPanel() {
 describe('SettingsRoot trigger', () => {
   it('shows installation instead of expected backend reconnection and restores connection feedback after failure', () => {
     const presentation = { phase: 'installing' as const, version: '1.0.1' }
-    const f = mount({ dictionary: zh, connectionState: 'connecting',
+    const f = mount({ dictionary: zh, connectionState: 'connecting', launcherAction: true,
       desktopUpdate: { failed: false, opening: false, presentation } })
-    expect(screen.getByRole('button', { name: '正在准备重启…' })).toBeTruthy()
+    const action = screen.getByRole('button', { name: 'Open models' })
+    expect(action.parentElement).toBe(screen.getByRole('button', { name: '设置' }).parentElement)
+    expect(action.previousElementSibling).toBe(screen.getByRole('button', { name: '正在准备重启…' }))
+    expect(action.nextElementSibling).toBeNull()
     expect(screen.queryByText('重新连接中')).toBeNull()
     f.setDesktopUpdate({ failed: false, opening: false,
       presentation: { phase: 'error', version: presentation.version, failure: 'install' } })
     expect(screen.queryByRole('button', { name: '重试更新' })).toBeNull()
-    expect(screen.getByText('重新连接中')).toBeTruthy()
+    expect(action.previousElementSibling).toBe(screen.getByText('重新连接中').closest('button'))
+  })
+
+  it.each([
+    { wide: true, action: 'Open models', section: 'models' },
+    { wide: false, action: 'Open default section', section: 'general' },
+  ])('lets a launcher action open settings with wide=$wide', ({ wide, action, section }) => {
+    mount({ wide, launcherAction: true })
+    fireEvent.click(screen.getByRole('button', { name: action }))
+    expect(screen.getByTestId(`section-${section}`)).toBeTruthy()
   })
   it.each([
     { column: 'expanded English', wide: true, dictionary: en, name: 'Settings' },

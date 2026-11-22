@@ -28,6 +28,7 @@ function injectedOf(c: TestClient): SettingsRootInjected {
 /** The shell's child declarations (chrome, actions, sections, and onboarding overlays). */
 const CHILD_SPECS = {
   'settings.launcher': { kind: 'single', scope: 'root' },
+  'settings.launcher.action': { kind: 'list', scope: 'root' },
   'settings.trigger': { kind: 'single', scope: 'root' },
   'settings.header': { kind: 'single', scope: 'root' },
   'settings.action': { kind: 'list', scope: 'root' },
@@ -91,6 +92,7 @@ describe('ui-settings-general shell', () => {
   withoutSettingsAccess('leaves sidebar.settings unoccupied while the current Peer may not read the settings description', async ({ start }) => {
     const c = await start()
     expect(c.ctx.slots.entries('sidebar.settings')).toEqual([])
+    expect(c.ctx.slots.spec('settings.launcher.action')).toBeUndefined()
   }, COLD_BOOT_TIMEOUT_MS)
 
   it('projects the section ledger: product sections in order, defaults for bare rows, stable snapshots', async ({ start }) => {

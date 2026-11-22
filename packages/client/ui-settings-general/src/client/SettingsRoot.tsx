@@ -125,7 +125,11 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
   } = props
   const { open, activeId } = useStore(state => state)
   const shortcut = useShortcuts(rows => rows.find(row => row.id === 'settings.open'))
-  const { close, openSection } = actions
+  const { close, open: openPanel, openSection } = actions
+  const openSettings = useCallback((sectionId?: string) => {
+    if (sectionId === undefined) openPanel()
+    else openSection(sectionId)
+  }, [openPanel, openSection])
   const [requestedOnboarding, setRequestedOnboarding] = useState<string | undefined>()
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
   const [showRecovery, setShowRecovery] = useState(false)
@@ -224,10 +228,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
     <>
       <div className={clsx(css.triggerRow, !wide && css.railRow)}>
         {renderSlot('settings.launcher', {
-          wide, settingsOpen: open, openSettings: (sectionId) => {
-            if (sectionId === undefined) actions.open()
-            else actions.openSection(sectionId)
-          },
+          wide, settingsOpen: open, openSettings,
           ...(shortcut?.keys.length ? { settingsShortcut: { keys: shortcut.keys, aria: shortcut.aria } } : {}),
           openOnboarding: (id) => { close(); setRequestedOnboarding(id) },
         }, { fallback: <Tooltip disabled={open} label={t('trigger')} shortcutKeys={shortcut?.keys}>
@@ -238,7 +239,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
             aria-keyshortcuts={shortcut?.aria}
             aria-haspopup="dialog"
             aria-expanded={open}
-            onClick={() => { actions.open() }}
+            onClick={() => { openSettings() }}
           >
             {renderSlot('settings.trigger', { wide })}
           </button>
@@ -254,6 +255,8 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
         />
         <DesktopUpdateIndicator wide={wide} hidden={connectionIndicator !== undefined && desktopUpdate.presentation?.phase !== 'installing'}
           t={t} view={desktopUpdate} onOpen={openDesktopUpdate} />
+        {/* The slot anchor reserves DOM order for actions that appear after a sibling portal mounts. */}
+        {renderSlot('settings.launcher.action', { wide, openSettings })}
       </div>
       {open && (
         <SettingsPanel
