@@ -1,4 +1,4 @@
-/** Prepare a clean fork checkout for the newest official DSH tag without committing or pushing. */
+/** Prepare a clean fork checkout for an official DSH release candidate without committing or pushing. */
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -10,14 +10,14 @@ const OFFICIAL_UPSTREAM = 'https://github.com/deepseek-ai/deepseek-harness.git'
 const MAX_GIT_OUTPUT_BYTES = 128 * 1024 * 1024
 
 /**
- * Select the highest valid DSH semantic version, including prereleases, from ls-remote output.
- * Annotated tags retain their tag-object identity; peeled entries and unrelated tags are ignored.
+ * Select the highest valid DSH release candidate from ls-remote output.
+ * Annotated tags retain their tag-object identity and peeled entries are ignored.
  * @param {string} output - Output of git ls-remote --tags.
- * @returns {{tag: string, version: string, object: string} | undefined} Highest official version tag.
+ * @returns {{tag: string, version: string, object: string} | undefined} Highest RC tag, if one exists.
  */
 export function selectLatestReleaseTag(output) {
   const releases = output.split(/\r?\n/).flatMap(line => {
-    const match = /^([0-9a-f]{40})\s+refs\/tags\/(dsh-v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/u.exec(line)
+    const match = /^([0-9a-f]{40})\s+refs\/tags\/(dsh-v\d+\.\d+\.\d+-rc\.\d+)$/u.exec(line)
     if (match === null) return []
     const version = semver.valid(match[2].slice('dsh-v'.length))
     return version === null ? [] : [{ tag: match[2], version, object: match[1] }]
@@ -26,9 +26,9 @@ export function selectLatestReleaseTag(output) {
 }
 
 /**
- * Apply only the product changes between the pinned release and the newest official tag.
- * The caller must provide a clean, disposable checkout. Conflicts leave the index available for
- * diagnosis and throw; this function never commits, resets an existing checkout, or pushes.
+ * Apply product changes from the pinned release to the highest newer official RC.
+ * Leave the checkout unchanged when no newer RC exists. The caller must provide a clean,
+ * disposable checkout. Conflicts throw and leave the index available for diagnosis.
  * @param {string} root - Clean fork worktree containing its baseline declaration.
  * @param {{upstream?: string}} options - Official repository, overridden by a private repository in tests.
  * @returns {{changed: boolean, tag: string, upstreamCommit: string}} Prepared release identity.
@@ -44,9 +44,8 @@ export function prepareRelease(root, { upstream = OFFICIAL_UPSTREAM } = {}) {
   const previous = verifyReleaseBase(root)
   const previousVersion = semver.valid(previous.upstreamTag.slice('dsh-v'.length))
   if (previousVersion === null) throw new Error('The pinned official release is not a semantic version')
-  const selected = selectLatestReleaseTag(git('ls-remote', '--tags', upstream, 'refs/tags/dsh-v*'))
-  if (selected === undefined) throw new Error('The official repository did not advertise any valid DSH release tags')
-  if (!semver.gt(selected.version, previousVersion)) {
+  const selected = selectLatestReleaseTag(git('ls-remote', '--tags', upstream, 'refs/tags/dsh-v*-rc.*'))
+  if (selected === undefined || !semver.gt(selected.version, previousVersion)) {
     return { changed: false, tag: previous.upstreamTag, upstreamCommit: previous.upstreamCommit }
   }
 
@@ -82,5 +81,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(process.env.GITHUB_OUTPUT, `changed=${result.changed}\ntag=${result.tag}\n`)
   }
-  console.log(result.changed ? `Prepared official release ${result.tag}` : `Already based on ${result.tag}`)
+  console.log(result.changed ? `Prepared official RC ${result.tag}` : `No official RC newer than ${result.tag}`)
 }

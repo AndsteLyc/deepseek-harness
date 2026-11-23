@@ -26,7 +26,8 @@ const BASE_STYLE = [
   '',
 ].join('\n')
 
-function fixture(t, { releaseAlreadyAncestor = false } = {}) {
+function fixture(t, { releaseAlreadyAncestor = false, baselineVersion = '0.2.2-rc.3' } = {}) {
+  const baselineTag = `dsh-v${baselineVersion}`
   const temporary = mkdtempSync(join(tmpdir(), 'dsh-official-release-sync-'))
   t.after(() => {
     assert.ok(basename(resolve(temporary)).startsWith('dsh-official-release-sync-'))
@@ -55,13 +56,13 @@ function fixture(t, { releaseAlreadyAncestor = false } = {}) {
   }
   upstreamGit('init', '--initial-branch=master')
   configure(upstream)
-  writeUpstream('package.json', JSON.stringify({ version: '0.2.2-rc.3' }))
+  writeUpstream('package.json', JSON.stringify({ version: baselineVersion }))
   writeUpstream('custom.css', BASE_STYLE)
   writeUpstream('api.js', 'export const authenticatedUrl = true\n')
   writeUpstream('.github/workflows/upstream.yml', 'name: old official automation\n')
   upstreamGit('add', '.')
   upstreamGit('commit', '-m', 'official release')
-  upstreamGit('tag', OLD_TAG)
+  upstreamGit('tag', baselineTag)
   const base = upstreamGit('rev-parse', 'HEAD')
   const tree = upstreamGit('rev-parse', 'HEAD^{tree}')
 
@@ -99,7 +100,7 @@ function fixture(t, { releaseAlreadyAncestor = false } = {}) {
   if (releaseAlreadyAncestor) git('read-tree', '--reset', '-u', base)
   write('custom.css', BASE_STYLE.replace('--accent: blue', '--accent: green'))
   write('.github/workflows/upstream.yml', 'name: fork-owned automation\n')
-  write('.github/fork-release.json', `${JSON.stringify({ upstreamTag: OLD_TAG, upstreamTree: tree, customPaths: ['custom.css'] }, null, 2)}\n`)
+  write('.github/fork-release.json', `${JSON.stringify({ upstreamTag: baselineTag, upstreamTree: tree, customPaths: ['custom.css'] }, null, 2)}\n`)
   git('add', '.')
   git('commit', '-m', 'fork customization over pinned release')
   return { root, upstream, git, upstreamGit, write, release, development, head: git('rev-parse', 'HEAD') }
@@ -109,14 +110,18 @@ function preparedDeclaration(f) {
   return JSON.parse(readFileSync(join(f.root, '.github/fork-release.json'), 'utf8'))
 }
 
-test('selects semantic versions including prereleases and ignores peeled or malformed tag names', () => {
+test('selects the highest official RC by semantic version', () => {
   const object = 'a'.repeat(40)
-  const tags = [
-    'dsh-v0.2.2-rc.9', 'dsh-v0.2.2-rc.10', 'dsh-v0.2.2', 'dsh-v0.2.3-alpha.1',
-    'dsh-v99.0.0^{}', 'fork-v100.0.0', 'dsh-v0.3.0-beta.01',
-  ].map(tag => `${object}\trefs/tags/${tag}`).join('\n')
-  assert.deepEqual(selectLatestReleaseTag(tags), { tag: 'dsh-v0.2.3-alpha.1', version: '0.2.3-alpha.1', object })
-  assert.equal(selectLatestReleaseTag(`${object}\trefs/tags/dsh-v0.2.2-rc.10\n${object}\trefs/tags/dsh-v0.2.2-rc.9`).tag, 'dsh-v0.2.2-rc.10')
+  const rejected = [
+    'dsh-v0.2.2', 'dsh-v0.2.3-alpha.1', 'dsh-v0.2.3-beta.1',
+    'dsh-v99.0.0-rc.1^{}', 'fork-v100.0.0-rc.1', 'dsh-v0.3.0-rc.01', 'dsh-v0.3.0-rc.1.extra',
+  ].map(tag => `${object}\trefs/tags/${tag}`)
+  const rc = ['dsh-v0.2.2-rc.9', 'dsh-v0.2.2-rc.10', 'dsh-v0.2.1-rc.20']
+    .map(tag => `${object}\trefs/tags/${tag}`)
+  assert.deepEqual(selectLatestReleaseTag([...rejected, ...rc].join('\n')), {
+    tag: 'dsh-v0.2.2-rc.10', version: '0.2.2-rc.10', object,
+  })
+  assert.equal(selectLatestReleaseTag(rejected.join('\n')), undefined)
 })
 
 test('leaves a clean fork unchanged when no newer official version exists', t => {
@@ -130,9 +135,24 @@ test('leaves a clean fork unchanged when no newer official version exists', t =>
   assert.equal(readFileSync(join(f.root, '.github/fork-release.json'), 'utf8'), before)
 })
 
-test('merges a new release with local customizations, preserving fork automation and excluding development master', t => {
+test('keeps a pinned alpha until a newer RC is available', t => {
+  const f = fixture(t, { baselineVersion: '0.2.3-alpha.2' })
+  const baseline = preparedDeclaration(f)
+  f.release('0.2.3-alpha.3')
+  const unchanged = { changed: false, tag: baseline.upstreamTag, upstreamCommit: f.git('rev-parse', baseline.upstreamTag) }
+  assert.deepEqual(prepareRelease(f.root, { upstream: f.upstream }), unchanged)
+  f.release('0.2.2-rc.5')
+  assert.deepEqual(prepareRelease(f.root, { upstream: f.upstream }), unchanged)
+  assert.deepEqual(preparedDeclaration(f), baseline)
+  assert.equal(f.git('status', '--porcelain'), '')
+  assert.equal(f.git('rev-parse', 'HEAD'), f.head)
+})
+
+test('merges a new RC with local customizations, preserving fork automation and excluding development master', t => {
   const f = fixture(t)
   const next = f.release()
+  f.release('0.2.3-alpha.1')
+  f.release('0.2.2')
   f.development()
   const result = prepareRelease(f.root, { upstream: f.upstream })
   assert.deepEqual(result, { changed: true, tag: NEXT_TAG, upstreamCommit: next.commit })

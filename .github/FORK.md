@@ -10,7 +10,7 @@ The current official baseline is recorded by tag and source tree in [fork-releas
 
 ## Automatic updates
 
-[Fork · Sync official release](workflows/fork-sync-release.yml) checks the official `dsh-v` tags every six hours and supports manual runs. It selects the highest semantic version, including prereleases, and proceeds only when it is newer than the current baseline. Development commits on upstream `master` are excluded.
+[Fork · Sync official release](workflows/fork-sync-release.yml) checks official release candidate tags (`dsh-vX.Y.Z-rc.N`) every six hours and supports manual runs. It selects the highest RC by semantic version and proceeds only when it is newer than the current baseline. Development commits on upstream `master` are excluded.
 
 The synchronizer applies the product changes from the old official release to the new tag with a three-way merge, preserving local customizations and the fork's automation. A conflict stops the run without committing or pushing. Successful preparation updates the baseline, installs the new locked dependencies, builds, and runs the customization checks. Only a verified result is committed and pushed to `custom`; packaging uses that exact commit. Future releases that change the customization APIs may require manual adaptation before these checks pass.
 

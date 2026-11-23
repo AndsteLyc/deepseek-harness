@@ -54,7 +54,7 @@ jobs:
       - name: Verify release synchronization regressions
         run: node --test .github/scripts/verify-release-base.test.mjs .github/scripts/sync-release.test.mjs
 
-      - name: Prepare latest official tag
+      - name: Prepare latest official RC tag
         id: prepare
         run: node .github/scripts/sync-release.mjs
 
