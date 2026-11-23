@@ -10,7 +10,7 @@ import { readCuaApplication } from '../../scripts/cua-helper/payload.ts'
 const provider = resolve('packages/experimental/cua-macos')
 const readJson = path => JSON.parse(readFileSync(path, 'utf8'))
 const { name, version } = readJson(join(provider, 'package.json'))
-assert.equal(name, '@deepseek-ai/dsh-experimental-cua-macos')
+assert.equal(name, '@deepseek-ai/dsh-cua-macos')
 assert.equal(version, readJson('package.json').version, 'CUA provider must match the Desktop release')
 const temp = mkdtempSync(join(tmpdir(), 'fork-cua-x64-'))
 try {

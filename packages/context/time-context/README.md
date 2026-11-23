@@ -29,7 +29,7 @@ Mount this plugin when the model should interpret unqualified dates and times in
 
 ### What the model gets
 
-Each injected reading has three lines: an ISO-shaped timestamp with numeric offset and IANA zone, the browser-zone policy for the request, and the elapsed duration in compact whole-second units. Step 1 measures from the latest preceding model-visible message; later steps measure from the preceding time-context event in the same turn. A missing baseline reports `unavailable`, and backward wall-clock movement clamps elapsed time to zero. The policy line is optional: `includeTimeZone: false` keeps the timestamp and the elapsed duration only. The `standard` preset sets it to `false`. The plugin defaults to `true`.
+By default, each injected reading has three lines: an ISO-shaped timestamp with numeric offset and IANA zone, the browser-zone policy for the request, and the elapsed duration in compact whole-second units. Step 1 measures from the latest preceding model-visible message; later steps measure from the preceding time-context event in the same turn. A missing baseline reports `unavailable`, and backward wall-clock movement clamps elapsed time to zero. The policy line is optional: `includeTimeZone: false` keeps the timestamp and the elapsed duration only. The `standard` preset sets it to `false`. The plugin defaults to `true`.
 
 ### Configuration
 
@@ -51,7 +51,7 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 ### Choosing the zone
 
-When the open turn contains exactly one Host-validated browser zone, the timestamp is formatted in that request-local zone. With missing or mixed browser-zone records, the configured `timeZone` formats the display; omitting it resolves the Node process zone once at plugin load, and every explicit fallback is validated through `Intl.DateTimeFormat`. The resolved instruction tells the model to interpret unqualified dates and times in the chosen zone, and to ask the user to clarify when those records are mixed or unavailable. With `includeTimeZone: false`, the model receives neither the unqualified-time instruction nor the clarification instruction; the timestamp still includes its numeric offset and IANA zone.
+A request-local zone is the canonical `clientTimeZone` that a writer records on a user message: the Web Host records the validated browser zone, and the SDK runtime records the prompt's explicit zone or its sampled process zone. Request preparation still refuses a noncanonical value. When the open turn contains exactly one such zone, the timestamp is formatted in that request-local zone. With missing or mixed browser-zone records, the configured `timeZone` formats the display; omitting it resolves the Node process zone once at plugin load, and every explicit fallback is validated through `Intl.DateTimeFormat`. The resolved instruction tells the model to interpret unqualified dates and times in the chosen zone, and to ask the user to clarify when those records are mixed or unavailable. With `includeTimeZone: false`, the timestamp still uses the selected zone and includes its numeric offset and IANA name. The model receives neither policy instruction.
 
 -----
 
@@ -72,14 +72,14 @@ The plugin prepends an `agent/pre-step` listener that delegates first and append
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: pre-step listener, due scheduling, reading composition |
-| [`src/request-zone.ts`](src/request-zone.ts) | Browser-zone policy derivation from open-turn `user-rpc` sources |
+| [`src/request-zone.ts`](src/request-zone.ts) | Browser-zone policy derivation from open-turn user sources that carry `clientTimeZone` |
 | [`src/timestamp.ts`](src/timestamp.ts) | `Intl.DateTimeFormat` creation and timestamp formatting |
 
 ### Main flow
 
 The pre-step listener is installed before awaiting projection registration. Steps arriving during activation wait for the reader; registration failure or owner disposal stops the request, and cancellation while waiting produces no reading.
 
-When an injection is due, the plugin samples the wall clock, derives the browser-zone policy, resolves the display zone (request-local or fallback), and renders the three-line reading. The private `timeContext` Projection stores message and injection times, the latest entered turn, and its distinct reported browser zones in encounter order. It retains zone facts from messages shadowed by compaction. Zone validation stays after rejection and refresh checks; replay does not invoke formatters or hooks. JSON checkpoints plus suffix replay match a full replay. Older-version cache rows rebuild from the full journal. A reading records an entered step, not a completed or transmitted request; a later preparation failure can leave it in history.
+When an injection is due, the plugin samples the wall clock, derives the browser-zone policy, resolves the display zone (request-local or fallback), and renders the reading. The private `timeContext` Projection stores message and injection times, the latest entered turn, and its distinct reported browser zones in encounter order. It retains zone facts from messages shadowed by compaction. Zone validation stays after rejection and refresh checks; replay does not invoke formatters or hooks. JSON checkpoints plus suffix replay match a full replay. Older-version cache rows rebuild from the full journal. A reading records an entered step, not a completed or transmitted request; a later preparation failure can leave it in history.
 
 </details>
 
@@ -103,7 +103,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 #### What the model sees
 
-Each injected message contains three lines. `<timestamp>` is an ISO-shaped timestamp with numeric offset and IANA zone; durations use compact whole-second units.
+With the default configuration, each injected message contains three lines. `<timestamp>` is an ISO-shaped timestamp with numeric offset and IANA zone; durations use compact whole-second units.
 
 ##### First step
 

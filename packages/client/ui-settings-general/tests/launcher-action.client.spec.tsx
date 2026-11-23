@@ -22,7 +22,7 @@ it('keeps a launcher action before a portal appended while the action is hidden'
   const outlet = document.querySelector('[data-slot="settings.launcher.action"]')
   const row = document.querySelector('[data-slot="settings.launcher"]')?.parentElement
   expect(outlet?.parentElement).toBe(row)
-  if (row == null || outlet === null) throw new Error('Expected the settings launcher row and action outlet')
+  if (!row || !outlet) throw new Error('Expected the settings launcher row and action outlet')
   expect(row.lastElementChild).toBe(outlet)
 
   const available = createSnapshotStore(false)

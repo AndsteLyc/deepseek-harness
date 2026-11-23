@@ -73,14 +73,14 @@ jobs:
         run: |
           for path in \
             packages/context/time-context/tests/time-context.spec.ts \
-            packages/client/connection/tests/browser-auth.host.spec.ts \
+            packages/host/authentication-token/tests/browser-auth.host.spec.ts \
             packages/client/connection/tests/node-half.host.spec.ts \
             packages/client/web/tests/base-styles.client.spec.ts; do
             test -f "$path"
           done
           pnpm exec vitest run \
             packages/context/time-context/tests/time-context.spec.ts \
-            packages/client/connection/tests/browser-auth.host.spec.ts \
+            packages/host/authentication-token/tests/browser-auth.host.spec.ts \
             packages/client/connection/tests/node-half.host.spec.ts \
             packages/client/web/tests/base-styles.client.spec.ts
 

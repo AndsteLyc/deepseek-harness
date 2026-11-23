@@ -1,5 +1,5 @@
 {
-  "upstreamTag": "dsh-v0.2.2-rc.5",
+  "upstreamTag": "dsh-v0.2.3-alpha.2",
   "customPaths": [
     "apps/desktop/README.i18n.yaml",
     "apps/desktop/README.md",
@@ -47,6 +47,7 @@
     "packages/llm/token-meter/tests/token-meter.spec.ts",
     "packages/llm/token-meter/tests/token-usage-projection.spec.ts",
     "packages/llm/token-meter/tests/tree-usage.spec.ts",
+    "snapshots/web/subagent-conversation/catalog-push.expected.md",
     "snapshots/web/subagent-conversation/composer-usage.expected.md",
     "packages/client/ui-model-selection/README.i18n.yaml",
     "packages/client/ui-model-selection/README.md",
@@ -103,5 +104,5 @@
     "packages/client/ui-settings/src/client/index.ts",
     "packages/extensions/cordis-client-runner/src/client/slot-catalog.ts"
   ],
-  "upstreamTree": "6ec0fcdcaf38bdf8ffa6675e30b036dc104a1ece"
+  "upstreamTree": "130215c8c7c9a99f77ea17ff851211e5c270713d"
 }

@@ -7,7 +7,8 @@
 
 import { z } from 'zod'
 import { SessionLogOffset, SessionSeq, type SessionHeader } from '@deepseek-ai/dsh-session'
-import { ReasoningEffortId } from '@deepseek-ai/dsh-llm/brand'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { foldSubagentDescriptor } from './descriptor.ts'
@@ -119,7 +120,7 @@ export interface IdentityState {
 const modelSelectionSchema = z.object({
   provider: z.string(),
   model: z.string(),
-  reasoningEffort: z.string().transform(ReasoningEffortId).exactOptional(),
+  reasoningEffort: z.string().transform(brandString<ReasoningEffortId>).exactOptional(),
 }).strict()
 const identityValueSchema: z.ZodType<SubagentIdentityProjection> = z.discriminatedUnion('mode', [
   z.object({

@@ -1,7 +1,8 @@
 /** Drive the shipped Web standard preset without a browser or HTTP listener. */
 import { resolveConfigPath } from '@deepseek-ai/dsh-app-boot'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 import { bootProductionProfile } from '../../../../test-support/loader-smoke/tests/fixtures/production-profile.ts'
 
 const configPath = process.argv[2]
@@ -13,7 +14,7 @@ const ctx = await bootProductionProfile({
 })
 try {
   const handle = await ctx.agents.create({
-    sessionId: SessionId('standard-preset-time-context'),
+    sessionId: brandString<SessionId>('standard-preset-time-context'),
     meta: { cwd: process.cwd(), agentPreset: 'standard' },
     agentOptions: { provider: 'standard-preset-clock-mock', model: 'mock' },
     setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),

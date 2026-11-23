@@ -1,8 +1,9 @@
 import { mountWorkingDirectoryFixture } from './working-directory-fixture.ts'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
-import { ReasoningEffortId } from '@deepseek-ai/dsh-llm/brand'
+import SessionStore, { SESSION_FORMAT_VERSION, type SessionId, SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
+import { brandString } from '@deepseek-ai/dsh-brand'
+import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, TurnEndReason } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '../src/index.ts'
@@ -29,7 +30,7 @@ function fold(events: SessionEvent[]) {
   return subagentTimingProjectionDefinition.wire.view(state)
 }
 
-const sessionHeader = { id: SessionId('child'), version: SESSION_FORMAT_VERSION, createdAt: 0, isSeeded: true } as const
+const sessionHeader = { id: brandString<SessionId>('child'), version: SESSION_FORMAT_VERSION, createdAt: 0, isSeeded: true } as const
 
 describe('subagent timing projection', () => {
   it('preserves historical one-shot identity without inventing a label', () => {
@@ -48,13 +49,13 @@ describe('subagent timing projection', () => {
       type: 'subagent/descriptor', seq: SessionSeq(seq), time: seq,
       data: {
         version: SUBAGENT_DESCRIPTOR_VERSION, mode: 'continuable', label: model, provider: 'spawn',
-        agentProvider: 'p', agentModel: model, agentReasoningEffort: ReasoningEffortId('low'),
+        agentProvider: 'p', agentModel: model, agentReasoningEffort: brandString<ReasoningEffortId>('low'),
       },
     })
     const request = (seq: number, model: string, effort?: string): SessionEvent<'request/header'> => ({
       type: 'request/header', seq: SessionSeq(seq), time: seq,
       data: { reason: 'change', header: {
-        config: { provider: 'p', model, ...effort === undefined ? {} : { reasoningEffort: ReasoningEffortId(effort) } },
+        config: { provider: 'p', model, ...effort === undefined ? {} : { reasoningEffort: brandString<ReasoningEffortId>(effort) } },
         ...effort === undefined ? {} : { adapterDefaults: { reasoningEffort: true } },
       } },
     })

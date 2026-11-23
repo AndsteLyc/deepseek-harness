@@ -31,7 +31,7 @@ import { join } from 'node:path'
 import { readCuaApplication } from './scripts/cua-helper/payload.ts'
 
 const directory = join(process.argv[2], 'DeepSeek Harness.app/Contents/Resources/app.asar.unpacked/dsh/node_modules',
-  '@deepseek-ai/dsh-experimental-cua-macos/native/bin/darwin-x64')
+  '@deepseek-ai/dsh-cua-macos/native/bin/darwin-x64')
 if (realpathSync(directory) !== directory) throw new Error(`CUA payload path traverses a symlink: ${directory}`)
 // The staged digest covers the signed x86_64 binary, its bundle resources, executable bits and ticket.
 const { bundle } = readCuaApplication(directory)

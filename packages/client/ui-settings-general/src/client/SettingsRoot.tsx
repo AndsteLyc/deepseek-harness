@@ -19,7 +19,7 @@ import clsx from 'clsx'
 import {
   ConnectionIndicator, Tooltip, useModalLayer,
   IconAgentPresetOutlineMedium, IconArchiveOutlineMedium, IconCloseOutlineRegular, IconDataOutlineMedium,
-  IconPersonalizationOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
+  IconPersonalizationOutlineMedium, IconRemoteConnectionOutlineMedium, IconSettingsOutlineMedium, IconUserOutlineMedium,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConnectionIndicatorState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
@@ -38,12 +38,14 @@ function navIcon(id: string) {
   if (id === 'agent-presets') return <IconAgentPresetOutlineMedium size={16} />
   if (id === 'plugins') return <IconPersonalizationOutlineMedium size={16} />
   if (id === 'archived-sessions') return <IconArchiveOutlineMedium size={16} />
+  if (id === 'remote-connection') return <IconRemoteConnectionOutlineMedium size={16} />
   return <IconSettingsOutlineMedium size={16} />
 }
 
 type PanelProps = {
   rows: readonly SettingsSectionRow[]
   renderSlot: SettingsRootComponentProps['renderSlot']
+  renderFactorySlot: SettingsRootComponentProps['renderFactorySlot']
   activeId: string | undefined
   onSelect: (id: string) => void
   onClose: () => void
@@ -54,7 +56,7 @@ type PanelProps = {
  * header button, a mask click, and document-level Escape (mounted only while
  * open, so the listener lifetime is the panel's).
  */
-function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelProps) {
+function SettingsPanel({ rows, renderSlot, renderFactorySlot, activeId, onSelect, onClose }: PanelProps) {
   // Entries can unmount underneath the requested id, so the render-time
   // projection falls back to the first row when the id is gone.
   const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
@@ -106,7 +108,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
           </button>
         </div>
         <div className={css.options}>
-          {active !== undefined && renderSlot('settings.section', { close: onClose }, { only: active })}
+          {active !== undefined && renderFactorySlot('settings.section.view', { id: active, close: onClose })}
         </div>
       </div>
     </div>
@@ -120,16 +122,12 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
  */
 export function SettingsRoot(props: SettingsRootComponentProps) {
   const {
-    wide, reconnect, useConnectionState, useSections, useOnboardingSteps, useSessions, renderSlot, t,
+    wide, reconnect, useConnectionState, useSections, useOnboardingSteps, useSessions, renderSlot, renderFactorySlot, t,
     useDesktopUpdate, openDesktopUpdate, useStore, actions, useShortcuts,
   } = props
   const { open, activeId } = useStore(state => state)
   const shortcut = useShortcuts(rows => rows.find(row => row.id === 'settings.open'))
-  const { close, open: openPanel, openSection } = actions
-  const openSettings = useCallback((sectionId?: string) => {
-    if (sectionId === undefined) openPanel()
-    else openSection(sectionId)
-  }, [openPanel, openSection])
+  const { close, openSection } = actions
   const [requestedOnboarding, setRequestedOnboarding] = useState<string | undefined>()
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
   const [showRecovery, setShowRecovery] = useState(false)
@@ -224,8 +222,14 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
     connectionIndicator = 'recovered'
   }
 
+  const openSettings = (sectionId?: string): void => {
+    if (sectionId === undefined) actions.open()
+    else actions.openSection(sectionId)
+  }
+
   return (
     <>
+      <div className={css.noticeRow} hidden={!wide}><div className={css.notice}>{renderSlot('settings.notice', { openSettings })}</div></div>
       <div className={clsx(css.triggerRow, !wide && css.railRow)}>
         {renderSlot('settings.launcher', {
           wide, settingsOpen: open, openSettings,
@@ -239,7 +243,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
             aria-keyshortcuts={shortcut?.aria}
             aria-haspopup="dialog"
             aria-expanded={open}
-            onClick={() => { openSettings() }}
+            onClick={() => { actions.open() }}
           >
             {renderSlot('settings.trigger', { wide })}
           </button>
@@ -262,6 +266,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
         <SettingsPanel
           rows={rows}
           renderSlot={renderSlot}
+          renderFactorySlot={renderFactorySlot}
           activeId={activeId}
           onSelect={actions.select}
           onClose={close}

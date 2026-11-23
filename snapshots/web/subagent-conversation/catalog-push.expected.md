@@ -1,1 +1,2 @@
-- button "2 subagents"
+- heading "Subagents" [level=2]
+- text: 2 completed
